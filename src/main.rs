@@ -1,52 +1,39 @@
 #![no_std]
 #![no_main]
 
-mod heartbeat;
-mod sensor_status;
-use bsp::entry;
 use defmt::*;
-use defmt_rtt as _;
-use panic_probe as _;
+use embassy_executor::Spawner;
+use embassy_rp::gpio;
+use embassy_time::{Duration, Timer};
+use gpio::{Level, Output};
+use {defmt_rtt as _, panic_probe as _};
 
-use rp_pico as bsp;
+#[embassy_executor::main]
+async fn main(_spawner: Spawner) {
+    // Initialise Peripherals
+    let p = embassy_rp::init(Default::default());
 
-use bsp::hal::{
-    clocks::{init_clocks_and_plls, Clock},
-    pac,
-    sio::Sio,
-    watchdog::Watchdog,
-};
+    // Create LED
+    let mut led = Output::new(p.PIN_25, Level::Low);
 
-#[entry]
-fn main() -> ! {
-    info!("Program start");
-    let mut pac = pac::Peripherals::take().unwrap();
-    let core = pac::CorePeripherals::take().unwrap();
-    let mut watchdog = Watchdog::new(pac.WATCHDOG);
-    let sio = Sio::new(pac.SIO);
+    // Loop
+    loop {
+        // Log
+        info!("LED On!");
 
-    // External high-speed crystal on the pico board is 12Mhz
-    let external_xtal_freq_hz = 12_000_000u32;
-    let clocks = init_clocks_and_plls(
-        external_xtal_freq_hz,
-        pac.XOSC,
-        pac.CLOCKS,
-        pac.PLL_SYS,
-        pac.PLL_USB,
-        &mut pac.RESETS,
-        &mut watchdog,
-    )
-    .ok()
-    .unwrap();
+        // Turn LED On
+        led.set_high();
 
-    let mut delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
+        // Wait 100ms
+        Timer::after(Duration::from_millis(100)).await;
 
-    let pins = bsp::Pins::new(
-        pac.IO_BANK0,
-        pac.PADS_BANK0,
-        sio.gpio_bank0,
-        &mut pac.RESETS,
-    );
+        // Log
+        info!("LED Off!");
 
-    loop {}
+        // Turn Led Off
+        led.set_low();
+
+        // Wait 100ms
+        Timer::after(Duration::from_millis(100)).await;
+    }
 }
