@@ -1,17 +1,18 @@
 #![no_std]
 #![no_main]
 
-use core::str::from_utf8;
-
 use cyw43_pio::PioSpi;
+use cyw43::SpiBusCyw43;
 use defmt::*;
 use embassy_executor::Spawner;
-use embassy_net::tcp::TcpSocket;
+use embassy_net::{tcp::client::{TcpClient, TcpClientState}, Config, Stack, StackResources};
 use embassy_rp::{
     bind_interrupts, gpio::{Level, Output}, peripherals::PIO0, pio::{InterruptHandler, Pio}
 };
-use embassy_time::{Duration, Timer};
-use embedded_io_async::Write;
+use embassy_time::Timer;
+use embedded_hal::digital::OutputPin;
+use reqwless::client::HttpClient;
+use static_cell::StaticCell;
 
 use {defmt_rtt as _, panic_probe as _};
 
@@ -23,6 +24,18 @@ const WIFI_PASSWORD: &str = "Oscariremma";
 bind_interrupts!(struct Irqs {
     PIO0_IRQ_0 => InterruptHandler<PIO0>;
 });
+
+#[embassy_executor::task]
+async fn wifi_task(
+    runner: cyw43::Runner<'static, impl OutputPin + 'static, impl SpiBusCyw43 + 'static>,
+) -> ! {
+    runner.run().await
+}
+
+#[embassy_executor::task]
+pub async fn net_task(stack: &'static Stack<cyw43::NetDriver<'static>>) -> ! {
+    stack.run().await
+}
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
@@ -42,6 +55,7 @@ async fn main(spawner: Spawner) {
     //});
 
     // Init network stack
+
     let pwr = Output::new(p.PIN_23, Level::Low);
     let cs = Output::new(p.PIN_25, Level::High);
     let mut pio = Pio::new(p.PIO0, Irqs);
@@ -58,11 +72,6 @@ async fn main(spawner: Spawner) {
     let (mut control, stack) = wifi::init_wifi(pwr, spi, &spawner).await;
     let stack = &*wifi::STACK.init(stack);
     wifi::start_network_stack(stack, &spawner);
-
-//    let pir_in = Input::new(p.PIN_28, embassy_rp::gpio::Pull::Down);
-//    loop {
-//        wifi.control.gpio_set(0, pir_in.is_high()).await;
-//    }
 
     loop {
         //control.join_open(WIFI_NETWORK).await;
@@ -83,46 +92,37 @@ async fn main(spawner: Spawner) {
 
     // And now we can use it!
 
-    let mut rx_buffer = [0; 4096];
-    let mut tx_buffer = [0; 4096];
-    let mut buf = [0; 4096];
+    let dns_client = embassy_net::dns::DnsSocket::new(stack);
+    let tcp_client_state: TcpClientState<4, 4096, 4096> = TcpClientState::new();
+    let mut tcp_client = TcpClient::new(stack, &tcp_client_state);
+    let mut http_client = HttpClient::new(&mut tcp_client, &dns_client);
+
+    let mut rx = [0; 4096];
 
     loop {
-        let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
-        socket.set_timeout(Some(Duration::from_secs(10)));
 
         control.gpio_set(0, false).await;
-        info!("Listening on TCP:1234...");
-        if let Err(e) = socket.accept(1234).await {
-            warn!("accept error: {:?}", e);
-            continue;
+    
+        Timer::after_secs(5).await;
+        let mut request = 
+        http_client.request(reqwless::request::Method::GET, "http://google.com").await
+        .unwrap();
+        let response = request.send(&mut rx).await;
+    
+        match response {
+            Ok(response) => {
+                let body = response.body().body_buf;
+                info!("response: {}", body);
+            }
+            Err(err) => {
+                info!("request failed: {:?}", err);
+            }
+            
         }
-
-        info!("Received connection from {:?}", socket.remote_endpoint());
+    
+        
         control.gpio_set(0, true).await;
+    
 
-        loop {
-            let n = match socket.read(&mut buf).await {
-                Ok(0) => {
-                    warn!("read EOF");
-                    break;
-                }
-                Ok(n) => n,
-                Err(e) => {
-                    warn!("read error: {:?}", e);
-                    break;
-                }
-            };
-
-            info!("rxd {}", from_utf8(&buf[..n]).unwrap());
-
-            match socket.write_all(&buf[..n]).await {
-                Ok(()) => {}
-                Err(e) => {
-                    warn!("write error: {:?}", e);
-                    break;
-                }
-            };
-        }
     }
 }
