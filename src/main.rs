@@ -11,7 +11,6 @@ use embassy_rp::{
 };
 use embassy_time::Timer;
 use embedded_hal::digital::OutputPin;
-use macaddr::MacAddr6;
 use reqwless::{client::{HttpClient, TlsConfig, TlsVerify}, headers, request::{RequestBody, RequestBuilder}};
 use serde::Serialize;
 
@@ -24,6 +23,8 @@ mod pir_sensor;
 use crate::config::CONFIG;
 
 const FIRMWARE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+static mut MAC_ADDRESS : [u8; 12] = [0; 12];
 
 
 bind_interrupts!(struct Irqs {
@@ -60,7 +61,7 @@ async fn main(spawner: Spawner) {
         p.DMA_CH0,
     );
 
-    let pir_sensor_input = Input::new(p.PIN_28, embassy_rp::gpio::Pull::Down);
+    spawner.spawn(pir_sensor::pir_task(p.PIN_28)).unwrap();
 
     let (mut control, stack) = wifi::init_wifi(pwr, spi, &spawner).await;
     let stack = &*wifi::STACK.init(stack);
@@ -93,16 +94,20 @@ async fn main(spawner: Spawner) {
     let tls_config = TlsConfig::new(0xdeadbeef,&mut tls_read_buf, &mut tls_write_buf, TlsVerify::None);
     let mut http_client = HttpClient::new_with_tls(&tcp_client, &dns_client, tls_config);
 
-    let mut rx = [0; 8192];
-    let mut tx = [0; 8192];
+    let mut rx = [0; 4096];
+    let mut tx = [0; 4096];
 
     let hardware_address = stack.hardware_address();
     let hardware_address = hardware_address.as_bytes();
+    let mac_string;
+    unsafe{
+        hex::encode_to_slice(&hardware_address, &mut MAC_ADDRESS);
+        mac_string = core::str::from_utf8(&MAC_ADDRESS).unwrap();
+    }
+    
 
-    
-    
     let mut sensor_report = SensorReport{
-        sensor_id: MacAddr6::new(hardware_address[0], hardware_address[1], hardware_address[2], hardware_address[3], hardware_address[4], hardware_address[5]),
+        sensor_id: mac_string,
         firmware_version: FIRMWARE_VERSION,
         auth_token: CONFIG.auth_token,
         occupants: 0,
@@ -110,27 +115,32 @@ async fn main(spawner: Spawner) {
     };
 
     let headers = [
-        ("Content-Type", "application/json"),
         ("Authorization", CONFIG.auth_token)
     ];
 
     loop {
     
         Timer::after_secs(60).await;
-
-        let mut request = 
-        http_client.request(reqwless::request::Method::POST, "https://liveinfo.spacenet.se/api/sensors/report").await
-        .unwrap();
-
-        request = request.content_type(headers::ContentType::ApplicationJson);
-        request = request.headers(&headers);
+        info!("sending report");
+        sensor_report.occupants = if pir_sensor::get_last_detection() + CONFIG.pir_delay*1000000 > embassy_time::Instant::now().as_micros(){
+            1
+        } else {
+            0
+        };
         let serialization_result = serde_json_core::to_slice(&sensor_report, &mut tx);
-        if let Err(e) = serialization_result {
-            //error!("serialization error: {:?}", e.to_string());
+        if serialization_result.is_err() {
+            error!("serialization error");
             continue;
         }
-        let slice = &tx[0..serialization_result.unwrap()];
-        //request = request.body(slice);
+
+        info!("sending report: {:?}", core::str::from_utf8(&tx[..serialization_result.unwrap()]).unwrap_or("couldn't parse"));
+        let mut request = 
+        http_client.request(reqwless::request::Method::POST, "https://liveinfo.spacenet.se/api/sensors/report").await
+        .unwrap()
+        .body(&tx[..serialization_result.unwrap()])
+        .content_type(headers::ContentType::ApplicationJson)
+        .headers(&headers);
+
         let response = request.send(&mut rx).await.unwrap();
         info!("response received, status: {:?}", response.status);
 
@@ -146,7 +156,7 @@ async fn main(spawner: Spawner) {
 #[derive(Serialize)]
 struct SensorReport {
     #[serde(rename = "sensorId")]
-    sensor_id: MacAddr6,
+    sensor_id: &'static str,
     #[serde(rename = "firmwareVersion")]
     firmware_version: &'static str,
     #[serde(rename = "authorization")]
