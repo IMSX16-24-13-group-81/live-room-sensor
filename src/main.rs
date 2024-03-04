@@ -5,14 +5,15 @@ use cyw43_pio::PioSpi;
 use cyw43::SpiBusCyw43;
 use defmt::*;
 use embassy_executor::Spawner;
-use embassy_net::{tcp::client::{TcpClient, TcpClientState}, Config, Stack, StackResources};
+use embassy_net::{tcp::client::{TcpClient, TcpClientState}, Stack};
 use embassy_rp::{
     bind_interrupts, gpio::{Input, Level, Output}, peripherals::PIO0, pio::{InterruptHandler, Pio}
 };
 use embassy_time::Timer;
 use embedded_hal::digital::OutputPin;
-use reqwless::client::{HttpClient, TlsConfig, TlsVerify};
-
+use macaddr::MacAddr6;
+use reqwless::{client::{HttpClient, TlsConfig, TlsVerify}, headers, request::{RequestBody, RequestBuilder}};
+use serde::Serialize;
 
 use {defmt_rtt as _, panic_probe as _};
 
@@ -22,6 +23,7 @@ mod pir_sensor;
 
 use crate::config::CONFIG;
 
+const FIRMWARE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 
 bind_interrupts!(struct Irqs {
@@ -92,16 +94,43 @@ async fn main(spawner: Spawner) {
     let mut http_client = HttpClient::new_with_tls(&tcp_client, &dns_client, tls_config);
 
     let mut rx = [0; 8192];
+    let mut tx = [0; 8192];
 
+    let hardware_address = stack.hardware_address();
+    let hardware_address = hardware_address.as_bytes();
+
+    
+    
+    let mut sensor_report = SensorReport{
+        sensor_id: MacAddr6::new(hardware_address[0], hardware_address[1], hardware_address[2], hardware_address[3], hardware_address[4], hardware_address[5]),
+        firmware_version: FIRMWARE_VERSION,
+        auth_token: CONFIG.auth_token,
+        occupants: 0,
+
+    };
+
+    let headers = [
+        ("Content-Type", "application/json"),
+        ("Authorization", CONFIG.auth_token)
+    ];
 
     loop {
-
-        control.gpio_set(0, false).await;
     
-        Timer::after_secs(5).await;
+        Timer::after_secs(60).await;
+
         let mut request = 
-        http_client.request(reqwless::request::Method::GET, "https://portainer.liveinfo.spacenet.se/sdfsgdsg").await
+        http_client.request(reqwless::request::Method::POST, "https://liveinfo.spacenet.se/api/sensors/report").await
         .unwrap();
+
+        request = request.content_type(headers::ContentType::ApplicationJson);
+        request = request.headers(&headers);
+        let serialization_result = serde_json_core::to_slice(&sensor_report, &mut tx);
+        if let Err(e) = serialization_result {
+            //error!("serialization error: {:?}", e.to_string());
+            continue;
+        }
+        let slice = &tx[0..serialization_result.unwrap()];
+        //request = request.body(slice);
         let response = request.send(&mut rx).await.unwrap();
         info!("response received, status: {:?}", response.status);
 
@@ -109,9 +138,20 @@ async fn main(spawner: Spawner) {
         
         let res = core::str::from_utf8(body).unwrap_or("couldn't parse");
         info!("response: {:?}", res);
-        
-        control.gpio_set(0, true).await;
-    
 
     }
+}
+
+
+#[derive(Serialize)]
+struct SensorReport {
+    #[serde(rename = "sensorId")]
+    sensor_id: MacAddr6,
+    #[serde(rename = "firmwareVersion")]
+    firmware_version: &'static str,
+    #[serde(rename = "authorization")]
+    auth_token: &'static str,
+    #[serde(rename = "occupants")]
+    occupants: u8,
+
 }

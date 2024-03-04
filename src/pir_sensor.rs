@@ -9,6 +9,10 @@ use embedded_hal::digital::InputPin;
 
 static PIR_SENSOR_LAST_DETECTION: AtomicU64 = AtomicU64::new(0);
 
+pub fn get_last_detection() -> u64 {
+    PIR_SENSOR_LAST_DETECTION.load(core::sync::atomic::Ordering::Relaxed)
+}
+
 #[embassy_executor::task]
 pub async fn pir_task(mut pir_sensor_input: Input<'static, PIN_23>) {
     loop {
