@@ -20,7 +20,7 @@ pub async fn net_task(stack: &'static Stack<cyw43::NetDriver<'static>>) -> ! {
 }
 
 pub static STACK: StaticCell<Stack<cyw43::NetDriver<'static>>> = StaticCell::new();
-static RESOURCES: StaticCell<StackResources<2>> = StaticCell::new();
+static RESOURCES: StaticCell<StackResources<4>> = StaticCell::new();
 
 pub async fn init_wifi(
         pwr: impl OutputPin + 'static,
@@ -46,7 +46,7 @@ pub async fn init_wifi(
         let stack = Stack::new(
             net_device,
             config,
-            RESOURCES.init(StackResources::<2>::new()),
+            RESOURCES.init(StackResources::<4>::new()),
             RANDOM_SEED,
         );
 

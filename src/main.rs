@@ -7,19 +7,22 @@ use defmt::*;
 use embassy_executor::Spawner;
 use embassy_net::{tcp::client::{TcpClient, TcpClientState}, Config, Stack, StackResources};
 use embassy_rp::{
-    bind_interrupts, gpio::{Level, Output}, peripherals::PIO0, pio::{InterruptHandler, Pio}
+    bind_interrupts, gpio::{Input, Level, Output}, peripherals::PIO0, pio::{InterruptHandler, Pio}
 };
 use embassy_time::Timer;
 use embedded_hal::digital::OutputPin;
-use reqwless::client::HttpClient;
-use static_cell::StaticCell;
+use reqwless::client::{HttpClient, TlsConfig, TlsVerify};
+
 
 use {defmt_rtt as _, panic_probe as _};
 
 mod wifi;
+mod config;
+mod pir_sensor;
 
-const WIFI_NETWORK: &str = "Oscar-WLAN";
-const WIFI_PASSWORD: &str = "Oscariremma";
+use crate::config::CONFIG;
+
+
 
 bind_interrupts!(struct Irqs {
     PIO0_IRQ_0 => InterruptHandler<PIO0>;
@@ -39,22 +42,8 @@ pub async fn net_task(stack: &'static Stack<cyw43::NetDriver<'static>>) -> ! {
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
+    crate::config::validate_config().unwrap();
     let p = embassy_rp::init(Default::default());
-
-    // To make flashing faster for development, you may want to flash the firmwares independently
-    // at hardcoded addresses, instead of baking them into the program with `include_bytes!`:
-    //     probe-rs download 43439A0.bin --format bin --chip RP2040 --base-address 0x10100000
-    //     probe-rs download 43439A0_clm.bin --format bin --chip RP2040 --base-address 0x10140000
-    //let fw = unsafe { core::slice::from_raw_parts(0x10100000 as *const u8, 230321) };
-    //let clm = unsafe { core::slice::from_raw_parts(0x10140000 as *const u8, 4752) };
-
-    //let config = embassy_net::Config::ipv4_static(embassy_net::StaticConfigV4 {
-    //    address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 69, 2), 24),
-    //    dns_servers: Vec::new(),
-    //    gateway: Some(Ipv4Address::new(192, 168, 69, 1)),
-    //});
-
-    // Init network stack
 
     let pwr = Output::new(p.PIN_23, Level::Low);
     let cs = Output::new(p.PIN_25, Level::High);
@@ -69,13 +58,15 @@ async fn main(spawner: Spawner) {
         p.DMA_CH0,
     );
 
+    let pir_sensor_input = Input::new(p.PIN_28, embassy_rp::gpio::Pull::Down);
+
     let (mut control, stack) = wifi::init_wifi(pwr, spi, &spawner).await;
     let stack = &*wifi::STACK.init(stack);
     wifi::start_network_stack(stack, &spawner);
 
     loop {
         //control.join_open(WIFI_NETWORK).await;
-        match control.join_wpa2(WIFI_NETWORK, WIFI_PASSWORD).await {
+        match control.join_wpa2(CONFIG.wifi_ssid, CONFIG.wifi_password).await {
             Ok(_) => break,
             Err(err) => {
                 info!("join failed with status={}", err.status);
@@ -92,12 +83,16 @@ async fn main(spawner: Spawner) {
 
     // And now we can use it!
 
+    let mut tls_read_buf: [u8; 16640] = [0; 16640];
+    let mut tls_write_buf: [u8; 8096] = [0; 8096];
     let dns_client = embassy_net::dns::DnsSocket::new(stack);
-    let tcp_client_state: TcpClientState<4, 4096, 4096> = TcpClientState::new();
-    let mut tcp_client = TcpClient::new(stack, &tcp_client_state);
-    let mut http_client = HttpClient::new(&mut tcp_client, &dns_client);
+    let tcp_client_state: TcpClientState<1, 4096, 4096> = TcpClientState::new();
+    let tcp_client = TcpClient::new(stack, &tcp_client_state);
+    let tls_config = TlsConfig::new(0xdeadbeef,&mut tls_read_buf, &mut tls_write_buf, TlsVerify::None);
+    let mut http_client = HttpClient::new_with_tls(&tcp_client, &dns_client, tls_config);
 
-    let mut rx = [0; 4096];
+    let mut rx = [0; 8192];
+
 
     loop {
 
@@ -105,21 +100,15 @@ async fn main(spawner: Spawner) {
     
         Timer::after_secs(5).await;
         let mut request = 
-        http_client.request(reqwless::request::Method::GET, "http://google.com").await
+        http_client.request(reqwless::request::Method::GET, "https://portainer.liveinfo.spacenet.se/sdfsgdsg").await
         .unwrap();
-        let response = request.send(&mut rx).await;
-    
-        match response {
-            Ok(response) => {
-                let body = response.body().body_buf;
-                info!("response: {}", body);
-            }
-            Err(err) => {
-                info!("request failed: {:?}", err);
-            }
-            
-        }
-    
+        let response = request.send(&mut rx).await.unwrap();
+        info!("response received, status: {:?}", response.status);
+
+        let body = response.body().read_to_end().await.unwrap();
+        
+        let res = core::str::from_utf8(body).unwrap_or("couldn't parse");
+        info!("response: {:?}", res);
         
         control.gpio_set(0, true).await;
     
