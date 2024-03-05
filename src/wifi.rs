@@ -4,6 +4,8 @@ use embassy_executor::Spawner;
 use embassy_net::{Config, Stack, StackResources};
 use embedded_hal::digital::OutputPin;
 use static_cell::StaticCell;
+use fixedstr::str16;
+use embassy_net_driver_channel::Device;
 
 const RANDOM_SEED: u64 = 0xdeadbeef;
 
@@ -56,4 +58,17 @@ pub async fn init_wifi(
 
 pub fn start_network_stack(wifi: &'static Stack<cyw43::NetDriver<'static>>, spawner: &Spawner) {
     unwrap!(spawner.spawn(net_task(wifi)));
+}
+
+
+pub fn get_mac_address(stack: &Stack<cyw43::NetDriver<'static>>) -> str16 {
+    let hardware_address = stack.hardware_address();
+    let hardware_address = hardware_address.as_bytes();
+    let mut mac_address_hex = [0; 12];
+    hex::encode_to_slice(hardware_address, &mut mac_address_hex).unwrap();
+    let mut mac_tmp : [u16; 12] = [0; 12];
+    for i in 0..12 {
+        mac_tmp[i] = hardware_address[i] as u16;
+    }
+    str16::from_utf16(&mac_tmp).unwrap()
 }

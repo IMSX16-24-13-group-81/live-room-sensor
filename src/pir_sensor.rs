@@ -1,12 +1,7 @@
-use core::future;
-
 use embassy_time::Timer;
 use portable_atomic::AtomicU64;
 
-use embassy_rp::{bind_interrupts, gpio::Input, peripherals::PIN_28};
-use embedded_hal::digital::InputPin;
-
-
+use embassy_rp::{gpio::Input, peripherals::PIN_28};
 
 static PIR_SENSOR_LAST_DETECTION: AtomicU64 = AtomicU64::new(0);
 
