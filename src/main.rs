@@ -22,8 +22,6 @@ mod config;
 mod pir_sensor;
 
 use crate::{config::CONFIG, wifi::get_mac_address};
-use embassy_net::socket::SocketSet;
-use embassy_net::device::Device;
 use embassy_net::dns::DnsSocket;
 
 const FIRMWARE_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -127,7 +125,22 @@ async fn main(spawner: Spawner) {
             error!("serialization error");
             continue;
         }
-        send_report(&mut http_client, &headers, &sensor_report, &mut tx, &mut rx).await;
+        info!("sending report: {:?}", core::str::from_utf8(&tx[..serialization_result.unwrap()]).unwrap_or("couldn't parse"));
+        let mut request = http_client
+            .request(reqwless::request::Method::POST, "https://liveinfo.spacenet.se/api/sensors/report")
+            .await
+            .unwrap()
+            .body(&tx[..serialization_result.unwrap()])
+            .content_type(headers::ContentType::ApplicationJson)
+            .headers(&headers);
+    
+        let response = request.send(&mut rx).await.unwrap();
+        info!("response received, status: {:?}", response.status);
+    
+        let body = response.body().read_to_end().await.unwrap();
+    
+        let res = core::str::from_utf8(&body).unwrap_or("couldn't parse");
+        info!("response: {:?}", res);
 
 
 
@@ -135,35 +148,7 @@ async fn main(spawner: Spawner) {
 }
 
 
-async fn send_report<'a, 'b>(
-    http_client: &mut HttpClient<'a, TcpClient<'a, Device<'b, 'a>, 1, 4096, 4096>, DnsSocket<'b, Device<'b, 'a>>>,
-    headers: &[(&str, &str)],
-    sensor_report: &SensorReport,
-    tx: &mut [u8],
-    rx: &mut [u8],
-) {
-    let serialization_result = serde_json_core::to_slice(sensor_report, tx);
-    if serialization_result.is_err() {
-        error!("serialization error");
-        return;
-    }
-    info!("sending report: {:?}", core::str::from_utf8(&tx[..serialization_result.unwrap()]).unwrap_or("couldn't parse"));
-    let mut request = http_client
-        .request(reqwless::request::Method::POST, "https://liveinfo.spacenet.se/api/sensors/report")
-        .await
-        .unwrap()
-        .body(&tx[..serialization_result.unwrap()])
-        .content_type(headers::ContentType::ApplicationJson)
-        .headers(headers);
 
-    let response = request.send(rx).await.unwrap();
-    info!("response received, status: {:?}", response.status);
-
-    let body = response.body().read_to_end().await.unwrap();
-
-    let res = core::str::from_utf8(&body).unwrap_or("couldn't parse");
-    info!("response: {:?}", res);
-}
 
 #[derive(Serialize)]
 struct SensorReport {
