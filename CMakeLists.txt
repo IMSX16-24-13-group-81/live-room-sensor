@@ -19,6 +19,7 @@ target_include_directories(live-room-sensor PRIVATE
 
 target_sources(live-room-sensor PRIVATE
         src/main.c
+        src/picohttps.c
 )
 
 add_compile_options(-Wall
@@ -32,4 +33,7 @@ target_link_libraries(live-room-sensor
         pico_cyw43_arch_lwip_threadsafe_background
         hardware_pwm
         hardware_pio
+        pico_lwip_mbedtls
+        pico_mbedtls
+        hardware_resets
 )
