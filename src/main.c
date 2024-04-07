@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include "pir_sensor.h"
+#include "micradar.h"
 
 int main() {
 
@@ -24,6 +25,9 @@ int main() {
 
     // Initialise PIR sensor
     pir_sensor_init();
+
+    // Initialise Micradar
+    micradar_init();
 
      // Initialise Pico W wireless hardware
      printf("Initializing CYW43\n");
