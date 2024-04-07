@@ -4,6 +4,8 @@
 #include "wifi.h"
 #include <stdio.h>
 
+#include "pir_sensor.h"
+
 int main() {
 
     // Fixes an issue with OpenOCD 0.12.0 and the RP2040 where all timer are frozen when debugging causing all code that uses sleep_ms to hang forever.
@@ -20,6 +22,8 @@ int main() {
         printf("Clean boot\n");
     }
 
+    // Initialise PIR sensor
+    pir_sensor_init();
 
      // Initialise Pico W wireless hardware
      printf("Initializing CYW43\n");
