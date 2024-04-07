@@ -19,6 +19,8 @@ target_include_directories(live-room-sensor PRIVATE
 
 target_sources(live-room-sensor PRIVATE
         src/main.c
+        src/pir_sensor.c
+        src/micradar.c
         src/picohttps.c
 )
 
