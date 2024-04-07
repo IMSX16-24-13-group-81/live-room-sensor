@@ -1,10 +1,10 @@
-#include <string.h>
 #include "micradar.h"
-#include "hardware/uart.h"
 #include "hardware/gpio.h"
-#include "pico/printf.h"
 #include "hardware/timer.h"
+#include "hardware/uart.h"
 #include "math.h"
+#include "pico/printf.h"
+#include <string.h>
 
 #define UART_ID uart1
 #define BAUD_RATE 115200
@@ -59,10 +59,9 @@ void parse_trajectory_info(uint8_t *buf, uint8_t len) {
     uint16_t message_content_len = buf[5] << 8 | buf[6];
 
     update_previous_counts(message_content_len / TRAJECTORY_INFO_REPORT_POINT_SIZE);
-
 }
 
-void handle_received_frame(){
+void handle_received_frame() {
     if (uart_rx_buf_head < 5) return;
 
     if (!checksum_is_valid(uart_rx_buf, uart_rx_buf_head)) {
@@ -78,32 +77,28 @@ void handle_received_frame(){
         default:
             printf("Unknown radar message received\n");
             break;
-
     }
 
     uart_rx_buf_head = 0;
-
 }
-
 
 void on_uart_rx() {
     uint8_t c;
     while (uart_is_readable(UART_ID)) {
         c = uart_getc(UART_ID);
-        if (uart_rx_buf_head == 0){
+        if (uart_rx_buf_head == 0) {
             // Check for the start of the message frame
             if (c != 0x53) continue;
 
             append_to_rx_buf(c);
-        } else if (uart_rx_buf_head == 1)
-        {
+        } else if (uart_rx_buf_head == 1) {
             // Check for the start of the message frame
             if (c != 0x59) {
                 uart_rx_buf_head = 0;
                 continue;
             }
             append_to_rx_buf(c);
-        } else if (uart_rx_buf_head >= RX_BUF_SIZE -1){
+        } else if (uart_rx_buf_head >= RX_BUF_SIZE - 1) {
             uart_rx_buf_head = 0;
             printf("Radar UART receive buffer full where is should not be possible! Clearing and resetting!\n");
             continue;
@@ -112,19 +107,20 @@ void on_uart_rx() {
         uart_rx_buf[uart_rx_buf_head] = c;
         uart_rx_buf_head = (uart_rx_buf_head + 1) % RX_BUF_SIZE;
 
-        if (uart_rx_buf_head > 5 && uart_rx_buf[uart_rx_buf_head-3] == 0x54 && uart_rx_buf[uart_rx_buf_head-2] == 0x43){
+        if (uart_rx_buf_head > 5 && uart_rx_buf[uart_rx_buf_head - 3] == 0x54 && uart_rx_buf[uart_rx_buf_head - 2] == 0x43) {
             // We have a complete message frame
             printf("Radar message frame received\n");
             handle_received_frame();
             uart_rx_buf_head = 0;
 
-        } else if (uart_rx_buf_head >= RX_BUF_SIZE -1){
+        } else if (uart_rx_buf_head >= RX_BUF_SIZE - 1) {
             uart_rx_buf_head = 0;
             printf("Radar UART receive buffer full without a complete frame found. Clearing and resetting!\n");
             continue;
         }
     }
 }
+
 /**
  * Get the current averaged count of detected objects
  * @return the current count of detected objects or -1 if the count is not valid
@@ -134,7 +130,7 @@ int16_t micradar_get_current_count() {
         return -1;
     }
 
-    float average = (float)previous_counts_sum / COUNT_AVERAGE_BUFFER_SIZE;
+    float average = (float) previous_counts_sum / COUNT_AVERAGE_BUFFER_SIZE;
 
     return roundf(average);
 }
@@ -161,5 +157,4 @@ void micradar_init() {
     irq_set_enabled(UART_IRQ, true);
 
     uart_set_irq_enables(UART_ID, true, false);
-
 }

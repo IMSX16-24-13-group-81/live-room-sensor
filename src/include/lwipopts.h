@@ -31,10 +31,10 @@
 #define MEM_LIBC_MALLOC 0
 
 // Byte alignment
-#define MEM_ALIGNMENT 4 // bytes
+#define MEM_ALIGNMENT 4// bytes
 
 // Heap size
-#define MEM_SIZE 4000 // bytes
+#define MEM_SIZE 4000// bytes
 
 /* Memory pool options ********************************************************/
 
@@ -205,4 +205,4 @@
 // Enable debugging
 #define LWIP_DEBUG 1
 
-#endif // LIVE_ROOM_SENSOR_LWIPOPTS_H
+#endif// LIVE_ROOM_SENSOR_LWIPOPTS_H

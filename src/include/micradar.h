@@ -1,5 +1,3 @@
-
-
 #ifndef LIVE_ROOM_SENSOR_MICRADAR_H
 #define LIVE_ROOM_SENSOR_MICRADAR_H
 #include <stdint.h>

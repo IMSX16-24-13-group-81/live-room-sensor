@@ -1,7 +1,3 @@
-//
-// Created by oscariremma on 3/26/24.
-//
-
 #ifndef LIVE_ROOM_SENSOR_MBEDTLS_CONFIG_H
 #define LIVE_ROOM_SENSOR_MBEDTLS_CONFIG_H
 
@@ -81,4 +77,4 @@
 #define MBEDTLS_ECDSA_C
 #define MBEDTLS_ASN1_WRITE_C
 
-#endif // LIVE_ROOM_SENSOR_MBEDTLS_CONFIG_H
+#endif// LIVE_ROOM_SENSOR_MBEDTLS_CONFIG_H
