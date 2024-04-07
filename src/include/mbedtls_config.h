@@ -1,20 +1,4 @@
-#ifndef LIVE_ROOM_SENSOR_MBEDTLS_CONFIG_H
-#define LIVE_ROOM_SENSOR_MBEDTLS_CONFIG_H
-
-/* Mbed-TLS configuration for Pico HTTPS example ******************************
- *                                                                            *
- *  Configuration for the Mbed-TLS library included in the Pico SDK and       *
- *  required for the Pico HTTPS example.                                      *
- *                                                                            *
- *  N.b. Not all options are strictly required; this is just an example       *
- *  configuration.                                                            *
- *                                                                            *
- *  https://github.com/Mbed-TLS/mbedtls/blob/v2.28.2/include/mbedtls/config.h *
- *                                                                            *
- ******************************************************************************/
-
-// Workaround for some mbedtls source files using INT_MAX without including
-// limits.h
+/* Workaround for some mbedtls source files using INT_MAX without including limits.h */
 #include <limits.h>
 
 #define MBEDTLS_NO_PLATFORM_ENTROPY
@@ -77,4 +61,6 @@
 #define MBEDTLS_ECDSA_C
 #define MBEDTLS_ASN1_WRITE_C
 
-#endif// LIVE_ROOM_SENSOR_MBEDTLS_CONFIG_H
+// The following is needed to parse a certificate
+#define MBEDTLS_PEM_PARSE_C
+#define MBEDTLS_BASE64_C

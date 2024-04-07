@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.5)
 set(PICO_SDK_PATH "${CMAKE_SOURCE_DIR}/lib/pico-sdk")
 include(pico_sdk_import.cmake)
 
@@ -6,6 +6,30 @@ project(live-room-sensor C CXX ASM)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
+
+set(FIRMWARE_VERSION "0.2.0")
+
+if (DEFINED ENV{WIFI_SSID} AND (NOT WIFI_SSID))
+    set(WIFI_SSID $ENV{WIFI_SSID})
+    message("Using WIFI_SSID from environment ('${WIFI_SSID}')")
+else ()
+    message(FATAL_ERROR "WIFI_SSID must be set in the environment")
+endif ()
+
+if (DEFINED ENV{WIFI_PASSWORD} AND (NOT WIFI_PASSWORD))
+    set(WIFI_PASSWORD $ENV{WIFI_PASSWORD})
+    message("Using WIFI_PASSWORD from environment")
+else ()
+    message(FATAL_ERROR "WIFI_PASSWORD must be set in the environment")
+endif ()
+
+if (DEFINED ENV{REPORT_API_KEY} AND (NOT REPORT_API_KEY))
+    set(REPORT_API_KEY $ENV{REPORT_API_KEY})
+    message("Using REPORT_API_KEY from environment")
+else ()
+    message(FATAL_ERROR "REPORT_API_KEY must be set in the environment")
+endif ()
+
 
 set(PICO_BOARD pico_w)
 pico_sdk_init()
@@ -17,11 +41,21 @@ target_include_directories(live-room-sensor PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/src/include
 )
 
+target_compile_definitions(live-room-sensor PRIVATE
+        FIRMWARE_VERSION="${FIRMWARE_VERSION}"
+        WIFI_SSID="${WIFI_SSID}"
+        WIFI_PASSWORD="${WIFI_PASSWORD}"
+        REPORT_API_KEY="${REPORT_API_KEY}"
+)
+
 target_sources(live-room-sensor PRIVATE
         src/main.c
         src/pir_sensor.c
         src/micradar.c
-        src/picohttps.c
+        src/sensor_controller.c
+        src/reset.c
+        src/reporting.c
+        src/https.c
 )
 
 add_compile_options(-Wall
