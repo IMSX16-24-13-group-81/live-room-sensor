@@ -51,7 +51,7 @@ int main() {
     // Enable the watchdog, requiring the watchdog to be updated every 5000ms or
     // the chip will reboot second arg is pause on debug which means the watchdog
     // will pause when stepping through code
-    //watchdog_enable(5000, 1);
+    watchdog_enable(5000, 1);
 
     while (true) {
         watchdog_update();

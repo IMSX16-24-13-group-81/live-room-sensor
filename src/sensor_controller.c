@@ -27,6 +27,6 @@ void sensor_controller_update() {
             occupants++;
         }
 
-        //send_sensor_report(occupants, radar_count, motion_detected);
+        send_sensor_report(occupants, radar_count, motion_detected);
     }
 }
