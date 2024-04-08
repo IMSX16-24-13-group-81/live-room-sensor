@@ -29,6 +29,7 @@ int main() {
         printf("CYW43 init failed\n");
         reset_pico();
     }
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);
     cyw43_arch_enable_sta_mode();
 
     printf("Initialized CYW43\n");
@@ -47,11 +48,12 @@ int main() {
     sensor_controller_init();
     reporting_init();
 
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, true);
 
     // Enable the watchdog, requiring the watchdog to be updated every 5000ms or
     // the chip will reboot second arg is pause on debug which means the watchdog
     // will pause when stepping through code
-    //watchdog_enable(5000, 1);
+    watchdog_enable(5000, 1);
 
     while (true) {
         watchdog_update();

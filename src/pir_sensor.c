@@ -20,7 +20,7 @@ void pir_sensor_interrupt_handler(uint gpio, uint32_t events) {
     }
 }
 
-bool pir_sensor_timer_callback() {
+bool pir_sensor_timer_callback(repeating_timer_t *rt) {
 
     if (gpio_get(PIR_SENSOR_GPIO)) {
         pir_sensor_last_motion_time = time_us_64();
