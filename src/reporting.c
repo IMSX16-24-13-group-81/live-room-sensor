@@ -102,9 +102,7 @@ static char request_buffer[1024];
 static char sensor_id[13];
 
 void reporting_init() {
-    uint8_t mac[6];
-    cyw43_ll_wifi_get_mac(&cyw43_state.cyw43_ll, (uint8_t *) &mac);
-    snprintf(sensor_id, sizeof(sensor_id), "%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    snprintf(sensor_id, sizeof(sensor_id), "%02x%02x%02x%02x%02x%02x", cyw43_state.mac[0], cyw43_state.mac[1], cyw43_state.mac[2], cyw43_state.mac[3], cyw43_state.mac[4], cyw43_state.mac[5]);
 }
 
 void send_sensor_report(int16_t occupants, int16_t radar_state, bool pir_state) {
