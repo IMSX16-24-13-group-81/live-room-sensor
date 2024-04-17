@@ -1,4 +1,7 @@
 #include "hardware/watchdog.h"
+#ifdef USE_NEW_MINEW_RADAR
+#include "minewsemi_radar.h"
+#endif
 #include "pico/cyw43_arch.h"
 #include "pico/stdlib.h"
 #include "reporting.h"
@@ -58,5 +61,8 @@ int main() {
     while (true) {
         watchdog_update();
         sensor_controller_update();
+#ifdef USE_NEW_MINEW_RADAR
+        minewsemi_radar_tick();
+#endif
     }
 }

@@ -1,5 +1,8 @@
 #ifndef LIVE_ROOM_SENSOR_MICRADAR_H
 #define LIVE_ROOM_SENSOR_MICRADAR_H
+
+#ifndef USE_NEW_MINEW_RADAR
+
 #include <stdint.h>
 
 /**
@@ -14,4 +17,6 @@ int16_t micradar_get_current_count();
  */
 void micradar_init();
 
-#endif //LIVE_ROOM_SENSOR_MICRADAR_H
+#endif//USE_NEW_MINEW_RADAR
+
+#endif//LIVE_ROOM_SENSOR_MICRADAR_H
