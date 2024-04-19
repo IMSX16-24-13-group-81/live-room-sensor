@@ -6,6 +6,8 @@
 #include "pico/printf.h"
 #include <string.h>
 
+#ifndef USE_NEW_MINEW_RADAR
+
 #define UART_ID uart1
 #define BAUD_RATE 9600
 #define UART_TX_PIN 4
@@ -153,3 +155,5 @@ void micradar_init() {
 
     uart_set_irq_enables(UART_ID, true, false);
 }
+
+#endif//USE_NEW_MINEW_RADAR

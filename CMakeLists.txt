@@ -7,7 +7,7 @@ project(live-room-sensor C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
-set(FIRMWARE_VERSION "0.2.0")
+set(FIRMWARE_VERSION "0.2.2")
 
 if (DEFINED ENV{WIFI_SSID} AND (NOT WIFI_SSID))
     set(WIFI_SSID $ENV{WIFI_SSID})
@@ -30,7 +30,6 @@ else ()
     message(FATAL_ERROR "REPORT_API_KEY must be set in the environment")
 endif ()
 
-
 set(PICO_BOARD pico_w)
 pico_sdk_init()
 
@@ -48,10 +47,16 @@ target_compile_definitions(live-room-sensor PRIVATE
         REPORT_API_KEY="${REPORT_API_KEY}"
 )
 
+target_compile_definitions(live-room-sensor PRIVATE
+        # Comment out to use the old micradar driver instead of the new minewsemi_radar driver
+        USE_NEW_MINEW_RADAR
+)
+
 target_sources(live-room-sensor PRIVATE
         src/main.c
         src/pir_sensor.c
         src/micradar.c
+        src/minewsemi_radar.c
         src/sensor_controller.c
         src/reset.c
         src/reporting.c

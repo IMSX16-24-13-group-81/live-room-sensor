@@ -23,6 +23,13 @@
 
 #define REPORTING_REQUEST_BODY_TEMPLATE "{\"firmwareVersion\":\"%s\",\"sensorId\":\"%s\",\"occupants\":%d,\"radarState\":%d,\"pirState\":%s}"
 
+
+#ifdef USE_NEW_MINEW_RADAR
+#define FIRMWARE_STRING FIRMWARE_VERSION "-minew"
+#else
+#define FIRMWARE_STRING FIRMWARE_VERSION "-micradar"
+#endif
+
 static const char REPORTING_REQUEST_TEMPLATE[] =
         "POST /api/sensors/report HTTP/1.1\r\n"
         "Host: " REPORTING_SERVER "\r\n"
@@ -110,7 +117,7 @@ void send_sensor_report(int16_t occupants, int16_t radar_state, bool pir_state) 
     char *pir_state_str = pir_state ? "true" : "false";
 
     int body_len = snprintf(NULL, 0, REPORTING_REQUEST_BODY_TEMPLATE,
-                            FIRMWARE_VERSION, sensor_id, occupants, radar_state, pir_state_str);
+                            FIRMWARE_STRING, sensor_id, occupants, radar_state, pir_state_str);
 
     if (body_len < 0) {
         printf("Failed to calculate request body size\n");
@@ -118,7 +125,7 @@ void send_sensor_report(int16_t occupants, int16_t radar_state, bool pir_state) 
     }
 
     int request_len = snprintf(request_buffer, sizeof(request_buffer), REPORTING_REQUEST_TEMPLATE,
-                               body_len, FIRMWARE_VERSION, sensor_id, occupants, radar_state, pir_state_str);
+                               body_len, FIRMWARE_STRING, sensor_id, occupants, radar_state, pir_state_str);
 
     if (request_len < 0 || request_len >= sizeof(request_buffer)) {
         printf("Failed to format request\n");
