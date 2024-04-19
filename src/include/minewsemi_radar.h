@@ -9,7 +9,7 @@ void minewsemi_init(void);
 
 int16_t minewsemi_get_current_count(void);
 
-void minewsemi_radar_tick(void)
+void minewsemi_radar_tick(void);
 
 #endif//USE_NEW_MINEW_RADAR
 

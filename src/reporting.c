@@ -125,7 +125,7 @@ void send_sensor_report(int16_t occupants, int16_t radar_state, bool pir_state) 
     }
 
     int request_len = snprintf(request_buffer, sizeof(request_buffer), REPORTING_REQUEST_TEMPLATE,
-                               body_len, FIRMWARE_VERSION, sensor_id, occupants, radar_state, pir_state_str);
+                               body_len, FIRMWARE_STRING, sensor_id, occupants, radar_state, pir_state_str);
 
     if (request_len < 0 || request_len >= sizeof(request_buffer)) {
         printf("Failed to format request\n");

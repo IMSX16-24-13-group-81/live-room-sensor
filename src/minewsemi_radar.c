@@ -2,6 +2,7 @@
 #include "hardware/gpio.h"
 #include "hardware/timer.h"
 #include "hardware/uart.h"
+#include "hardware/watchdog.h"
 #include "math.h"
 #include "pico/printf.h"
 #include "pico/time.h"
@@ -16,13 +17,13 @@
 
 #define RX_BUF_SIZE 8192
 
-#define COUNT_AVERAGE_BUFFER_SIZE 256
+#define COUNT_AVERAGE_BUFFER_SIZE 16
 
 #define TRAJECTORY_INFO_REPORT 0x8202
 #define TRAJECTORY_INFO_REPORT_POINT_SIZE 11
 
 #define COUNT_VALIDITY_TIMEOUT_MS 5000
-#define RESET_TIMEOUT_MS 10000
+#define RESET_TIMEOUT_MS 60000
 
 #define MAX_AT_RESPONSE_LENGTH 16
 
@@ -123,7 +124,7 @@ void parse_radar_frame(void) {
     frame.person_count = persons_size / sizeof(radar_person_t);
     frame.persons = (radar_person_t *) &uart_rx_buf[end_of_points + 8];
 
-    printf("We have %lu points and %lu persons\n", frame.point_count, frame.person_count);
+    //printf("We have %lu points and %lu persons\n", frame.point_count, frame.person_count);
     update_previous_counts(frame.person_count);
 }
 
@@ -261,16 +262,25 @@ int16_t minewsemi_get_current_count(void) {
 void minewsemi_reset_and_start(void) {
     last_reset_time = time_us_64();
     uart_puts(UART_ID, "AT+RESET\n");
-    sleep_ms(1000);
+    watchdog_update();
+    sleep_ms(2000);
     uart_puts(UART_ID, "AT+START\n");
-}
+    watchdog_update();AT+STOP
+    sleep_ms(1000);
+    uart_puts(UART_ID, "AT+RANGE=1000\n");
+    watchdog_update();
+    sleep_ms(1000);
+    uart_puts(UART_ID, "AT+SENS=10\n");
+
+}AT+SETTING
 
 /**
  * Tick function to be called periodically
  */
 void minewsemi_radar_tick(void) {
     // If we have not received a valid count in a while, reset the radar
-    if (time_us_64() - last_reset_time > RESET_TIMEOUT_MS * 1000 && time_us_64() - last_count_time > COUNT_VALIDITY_TIMEOUT_MS * 10 * 1000) {
+    if ((time_us_64() - last_reset_time > RESET_TIMEOUT_MS * 1000) &&
+        (time_us_64() - last_count_time > COUNT_VALIDITY_TIMEOUT_MS * 10 * 1000)) {
         printf("Resetting radar\n");
         minewsemi_reset_and_start();
     }
