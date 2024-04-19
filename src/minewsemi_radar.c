@@ -17,7 +17,7 @@
 
 #define RX_BUF_SIZE 8192
 
-#define COUNT_AVERAGE_BUFFER_SIZE 16
+#define COUNT_AVERAGE_BUFFER_SIZE 800
 
 #define TRAJECTORY_INFO_REPORT 0x8202
 #define TRAJECTORY_INFO_REPORT_POINT_SIZE 11
@@ -257,22 +257,38 @@ int16_t minewsemi_get_current_count(void) {
 }
 
 /**
- * Reset and start the radar sensor
+ * Reset and configure the radar sensor
  */
-void minewsemi_reset_and_start(void) {
-    last_reset_time = time_us_64();
+void minewsemi_reset_and_configure(void) {
     uart_puts(UART_ID, "AT+RESET\n");
     watchdog_update();
-    sleep_ms(2000);
-    uart_puts(UART_ID, "AT+START\n");
-    watchdog_update();AT+STOP
     sleep_ms(1000);
+    uart_puts(UART_ID, "AT+STOP\n");
+    sleep_ms(100);
+    uart_puts(UART_ID, "AT+MONTIME=10\n");
+    sleep_ms(100);
+    uart_puts(UART_ID, "AT+TIME=100\n");
+    sleep_ms(100);
     uart_puts(UART_ID, "AT+RANGE=1000\n");
+    sleep_ms(100);
+    uart_puts(UART_ID, "AT+SENS=19\n");
+    sleep_ms(100);
+    uart_puts(UART_ID, "AT+WINARANGE=999999999999\n");
+    sleep_ms(100);
+    uart_puts(UART_ID, "AT+WINBRANGE=999999999999\n");
+    sleep_ms(100);
+    uart_puts(UART_ID, "AT+WINCRANGE=999999999999\n");
+    sleep_ms(100);
+    uart_puts(UART_ID, "AT+WINDRANGE=999999999999\n");
+    sleep_ms(100);
+    uart_puts(UART_ID, "AT+WINERANGE=999999999999\n");
+    sleep_ms(100);
+    uart_puts(UART_ID, "AT+WINFRANGE=999999999999\n");
+    sleep_ms(100);
+    uart_puts(UART_ID, "AT+START\n");
     watchdog_update();
-    sleep_ms(1000);
-    uart_puts(UART_ID, "AT+SENS=10\n");
-
-}AT+SETTING
+    last_reset_time = time_us_64();
+}
 
 /**
  * Tick function to be called periodically
@@ -282,7 +298,7 @@ void minewsemi_radar_tick(void) {
     if ((time_us_64() - last_reset_time > RESET_TIMEOUT_MS * 1000) &&
         (time_us_64() - last_count_time > COUNT_VALIDITY_TIMEOUT_MS * 10 * 1000)) {
         printf("Resetting radar\n");
-        minewsemi_reset_and_start();
+        minewsemi_reset_and_configure();
     }
 }
 
@@ -309,7 +325,7 @@ void minewsemi_init(void) {
 
     uart_set_irq_enables(UART_ID, true, false);
 
-    minewsemi_reset_and_start();
+    minewsemi_reset_and_configure();
 }
 
 #endif
