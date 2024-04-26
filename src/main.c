@@ -13,6 +13,7 @@
 #include "reporting.h"
 #include "reset.h"
 #include "sensor_controller.h"
+#include "version.h"
 #include <stdio.h>
 
 
@@ -31,6 +32,8 @@ int main() {
     } else {
         printf("Clean boot\n");
     }
+
+    printf("Firmware version: "FIRMWARE_STRING"\n");
 
     // Initialise Pico W wireless hardware
     printf("Initializing CYW43\n");
