@@ -4,8 +4,8 @@
 #include "hardware/uart.h"
 #include "hardware/watchdog.h"
 #include "math.h"
-#include "pico/time.h"
 #include "multi_printf.h"
+#include "pico/time.h"
 #include <string.h>
 
 #ifdef USE_NEW_MINEW_RADAR
@@ -170,7 +170,6 @@ void handle_studying_response(void) {
     } else {
         multi_printf("Unknown studying response\n");
     }
-
 }
 
 void on_uart_rx() {
@@ -280,7 +279,6 @@ void on_uart_rx() {
                 }
                 break;
             }
-
         }
 
         if (uart_rx_buf_head >= RX_BUF_SIZE - 1) {
@@ -366,19 +364,16 @@ void minewsemi_start_studying(void) {
  * Tick function to be called periodically
  */
 void minewsemi_radar_tick(void) {
-    bool radar_timeout = time_us_64() > ((COUNT_VALIDITY_TIMEOUT_MS * 10 * 1000) + last_count_time);
-    bool reset_cooldown = time_us_64() < ((RESET_TIMEOUT_MS * 1000) + last_reset_time);
-
-    static int i = 0;
-    if (i++ % 300000 == 0) {
-        multi_printf("Radar timeout: %d, Reset cooldown: %d, Studying: %d\n", radar_timeout, reset_cooldown, studying);
-        multi_printf("Time since last count: %llu\n", time_us_64() - last_count_time);
-        multi_printf("Time until count validity timeout: %llu\n",
-                     COUNT_VALIDITY_TIMEOUT_MS * 10 * 1000 - (time_us_64() - last_count_time));
-    }
+    uint64_t now = time_us_64();
+    bool radar_timeout = now > ((COUNT_VALIDITY_TIMEOUT_MS * 10 * 1000) + last_count_time);
+    bool reset_cooldown = now < ((RESET_TIMEOUT_MS * 1000) + last_reset_time);
 
     // If we have not received a valid count in a while, reset the radar
     if (reset_requested || (radar_timeout && !reset_cooldown && !studying)) {
+
+        multi_printf("Last count time %llu, Last reset time %llu, Current time %llu, Count limit %llu, Reset limit %llu\n",
+                     last_count_time, last_reset_time, now, ((COUNT_VALIDITY_TIMEOUT_MS * 10 * 1000) + last_count_time),
+                     ((RESET_TIMEOUT_MS * 1000) + last_reset_time));
 
         reset_requested = false;
         multi_printf("Resetting radar\n");
