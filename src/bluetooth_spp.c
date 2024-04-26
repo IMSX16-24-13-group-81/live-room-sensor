@@ -241,7 +241,7 @@ void process_received_command(uint8_t *packet, uint16_t size) {
 
     if (command_size > COMMAND_SEND_COMMAND_TO_MINW_RADAR_SIZE &&
         memcmp(command, COMMAND_SEND_COMMAND_TO_MINW_RADAR, COMMAND_SEND_COMMAND_TO_MINW_RADAR_SIZE) == 0) {
-        multi_printf("Sending command to Minew radar\n");
+        multi_printf("Queueing command for Minew radar\n");
         bool success = minewsemi_request_send_message(command + COMMAND_SEND_COMMAND_TO_MINW_RADAR_SIZE,
                                                       command_size - COMMAND_SEND_COMMAND_TO_MINW_RADAR_SIZE);
         if (!success) {
