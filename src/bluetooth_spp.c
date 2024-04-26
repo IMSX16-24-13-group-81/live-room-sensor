@@ -46,6 +46,7 @@
 
 #include "btstack.h"
 #include "multi_printf.h"
+#include "version.h"
 
 #ifdef USE_NEW_MINEW_RADAR
 
@@ -66,6 +67,8 @@
 #define COMMAND_SEND_COMMAND_TO_MINW_RADAR_SIZE (sizeof(COMMAND_SEND_COMMAND_TO_MINW_RADAR) - 1)
 #define COMMAND_RESET_PICO "PICO-RESET"
 #define COMMAND_RESET_PICO_SIZE (sizeof(COMMAND_RESET_PICO) - 1)
+#define COMMAND_GET_PICO_VERSION "PICO-VERSION"
+#define COMMAND_GET_PICO_VERSION_SIZE (sizeof(COMMAND_GET_PICO_VERSION) - 1)
 
 #define COMPLETE_BLUETOOTH_AUTH_MESSAGE BLUETOOTH_AUTH_TOKEN"\r\n"
 #define COMPLETE_BLUETOOTH_AUTH_MESSAGE_SIZE (sizeof(COMPLETE_BLUETOOTH_AUTH_MESSAGE) - 1)
@@ -200,12 +203,7 @@ void process_authenticate_packet(uint8_t *packet, uint16_t size) {
         rfcomm_user_has_authenticated = true;
         start_send_timer();
         bluetooth_printf("Authenticated\n");
-        bluetooth_printf("Version: %s\n", FIRMWARE_VERSION);
-#ifdef USE_NEW_MINEW_RADAR
-        bluetooth_printf("With Minew radar support\n");
-#else
-        bluetooth_printf("With micradar support\n");
-#endif
+        bluetooth_printf("Version: %s\n", FIRMWARE_STRING);
         printf("Bluetooth user authenticated\n");
 
     } else {
@@ -257,6 +255,11 @@ void process_received_command(uint8_t *packet, uint16_t size) {
     if (command_size == COMMAND_RESET_PICO_SIZE && memcmp(command, COMMAND_RESET_PICO, COMMAND_RESET_PICO_SIZE) == 0) {
         multi_printf("Setting reset Pico request flag!\n");
         request_pico_reset();
+        return;
+    }
+
+    if (command_size == COMMAND_GET_PICO_VERSION_SIZE && memcmp(command, COMMAND_GET_PICO_VERSION, COMMAND_GET_PICO_VERSION_SIZE) == 0) {
+        bluetooth_printf("Version: %s\n", FIRMWARE_STRING);
         return;
     }
 

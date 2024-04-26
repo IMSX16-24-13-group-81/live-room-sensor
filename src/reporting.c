@@ -1,32 +1,15 @@
 #include "reporting.h"
 
-
-/*
- * Copyright (c) 2023 Raspberry Pi (Trading) Ltd.
- *
- * SPDX-License-Identifier: BSD-3-Clause
- */
-
-#include <string.h>
-#include <time.h>
-
 #include "cyw43.h"
 #include "cyw43_ll.h"
-#include "hardware/watchdog.h"
 #include "https.h"
-#include "lwip/pbuf.h"
 #include "reset.h"
 #include "multi_printf.h"
+#include "version.h"
 
 #define MAX_REPORTING_RETRIES 3
 
 #define REPORTING_REQUEST_BODY_TEMPLATE "{\"firmwareVersion\":\"%s\",\"sensorId\":\"%s\",\"occupants\":%d,\"radarState\":%d,\"pirState\":%s}"
-
-#ifdef USE_NEW_MINEW_RADAR
-#define FIRMWARE_STRING FIRMWARE_VERSION "-minew"
-#else
-#define FIRMWARE_STRING FIRMWARE_VERSION "-micradar"
-#endif
 
 static const char REPORTING_REQUEST_TEMPLATE[] =
         "POST " REPORTING_PATH " HTTP/1.1\r\n"

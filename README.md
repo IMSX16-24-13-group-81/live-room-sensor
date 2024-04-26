@@ -22,7 +22,17 @@ An example of the JSON payload that is sent to the reporting server is:
 The code also has a debug console that can be accessed via Bluetooth SPP.
 The debug console is password protected and the password is set via the BLUETOOTH_AUTH_TOKEN environment variable.
 To connect use a Bluetooth SPP terminal and after connecting send the password followed by a newline and carriage return (often added by the terminal automatically).
-After the password is accepted you will see a "Authenticated" message and then you can start sending commands and receiving debug information.
+After the password is accepted you will see an "Authenticated" message and then you can start sending commands and receiving debug information.
+All command are case-sensitive and need to be terminated with a newline and carriage return.
+They must also be sent in one SPP packet, so if you are using a terminal that sends the characters one by one, you need to type the command in a text editor and then copy-paste it into the terminal.
+
+The folowing commands are available:
+- `AT+PICO-RESET` - Shows a list of available commands
+- `AT+PICO-VERSION` - Shows the firmware version
+
+The following commands are only available if the new Minew radar is used:
+- `AT+MINEW-STUDY` - Starts the study/calibration mode of the Minew radar. The room should be empty during this time.
+- `AT+MINEW-COMMAND=AT+xxx` - Sends the command `AT+xxx` to the Minew radar. The response will be printed to the debug console.
 
 ## Building
 To build the code CMAKE expects a few environment variables to be set:
