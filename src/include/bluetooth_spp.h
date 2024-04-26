@@ -20,7 +20,7 @@ bool bluetooth_vprintf(const char *format, va_list args);
  * @param buffer buffer to send
  * @param actual_size actual size of the buffer
  */
-bool mark_buffer_to_send(uint8_t *buffer, size_t actual_size);
+bool mark_buffer_to_send(const uint8_t *buffer, size_t actual_size);
 
 /**
  * @brief Get a free send buffer

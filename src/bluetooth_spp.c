@@ -41,12 +41,12 @@
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "btstack.h"
 #include "multi_printf.h"
 #include "version.h"
+#include "reset.h"
 
 #ifdef USE_NEW_MINEW_RADAR
 
@@ -151,7 +151,7 @@ uint8_t *get_free_send_buffer(size_t prelim_size) {
  * @param buffer buffer to send
  * @param actual_size actual size of the buffer
  */
-bool mark_buffer_to_send(uint8_t *buffer, size_t actual_size) {
+bool mark_buffer_to_send(const uint8_t *buffer, size_t actual_size) {
 
     for (int i = 0; i < SEND_QUEUE_SIZE; i++) {
         if (send_queue[i].buffer == buffer) {
@@ -356,15 +356,12 @@ static void spp_service_setup(void) {
 
  */
 
-/* LISTING_START(SppServerPacketHandler): SPP Server - Heartbeat Counter over RFCOMM */
 static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size) {
     UNUSED(channel);
 
-    /* LISTING_PAUSE */
     bd_addr_t event_addr;
     uint8_t rfcomm_channel_nr;
     uint16_t mtu;
-    int i;
 
     switch (packet_type) {
         case HCI_EVENT_PACKET:
@@ -426,10 +423,8 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
         default:
             break;
     }
-    /* LISTING_RESUME */
 }
 
-/* LISTING_END */
 
 
 static void rfcomm_send_now_timer_handler(btstack_timer_source_t *ts) {
@@ -464,4 +459,3 @@ int btstack_init() {
 
     return 0;
 }
-/* EXAMPLE_END */
