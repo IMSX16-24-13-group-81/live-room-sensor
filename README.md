@@ -2,13 +2,13 @@
 Embedded code to read sensor information about occupation in rooms
 
 ## Description
-This code is ment to run on a Pico W and reads radar information from ether a MicRadar R60AMP1 or a Minewsemi MS72SF1 radar via UART on GPIO 4-5.
+This code is meant to run on a Pico W and reads radar information from either a MicRadar R60AMP1 or a Minewsemi MS72SF1 radar via UART on GPIO 4-5.
 In addition to the radar information, the code reads the state of a PIR sensor(or any digital sensor) on GPIO 23.
 
 Then once every minute it will report the state of the PIR sensor and the radar information to a central server via HTTPS.
 The certificate for the reporting server is hardcoded to be a Let's Encrypt R3 certificate.
 
-An example of the JSON payload that is sent to the reporing server is:
+An example of the JSON payload that is sent to the reporting server is:
 ```json
 {
   "firmwareVersion": "0.2.2-Minew",
@@ -18,6 +18,11 @@ An example of the JSON payload that is sent to the reporing server is:
   "pirState": 1
 }
 ```
+
+The code also has a debug console that can be accessed via Bluetooth SPP.
+The debug console is password protected and the password is set via the BLUETOOTH_AUTH_TOKEN environment variable.
+To connect use a Bluetooth SPP terminal and after connecting send the password followed by a newline and carriage return (often added by the terminal automatically).
+After the password is accepted you will see a "Authenticated" message and then you can start sending commands and receiving debug information.
 
 ## Building
 To build the code CMAKE expects a few environment variables to be set:
