@@ -37,11 +37,34 @@ else ()
     message(FATAL_ERROR "REPORT_API_KEY must be set in the environment")
 endif ()
 
+if (DEFINED ENV{REPORTING_SERVER} AND (NOT REPORTING_SERVER))
+    set(REPORTING_SERVER $ENV{REPORTING_SERVER})
+    message("Using REPORTING_SERVER from environment ('${REPORTING_SERVER}')")
+else ()
+    message(FATAL_ERROR "REPORTING_SERVER must be set in the environment")
+endif ()
+
+if (DEFINED ENV{REPORTING_PATH} AND (NOT REPORTING_PATH))
+    set(REPORTING_PATH $ENV{REPORTING_PATH})
+    message("Using REPORTING_ENDPOINT from environment ('${REPORTING_PATH}')")
+else ()
+    message(FATAL_ERROR "REPORTING_ENDPOINT must be set in the environment")
+endif ()
+
 set(PICO_BOARD pico_w)
 pico_sdk_init()
 
 add_executable(live-room-sensor)
 pico_add_extra_outputs(live-room-sensor)
+
+if (DEFINED ENV{USE_NEW_MINEW_RADAR} AND (NOT USE_NEW_MINEW_RADAR))
+    target_compile_definitions(live-room-sensor PRIVATE
+            USE_NEW_MINEW_RADAR
+    )
+    message("USE_NEW_MINEW_RADAR is defined in the environment. Using radar driver for minewsemi")
+else ()
+    message("USE_NEW_MINEW_RADAR is not defined in the environment. Using radar driver for micradar")
+endif ()
 
 target_include_directories(live-room-sensor PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/src/include
@@ -53,11 +76,8 @@ target_compile_definitions(live-room-sensor PRIVATE
         WIFI_PASSWORD="${WIFI_PASSWORD}"
         REPORT_API_KEY="${REPORT_API_KEY}"
         BLUETOOTH_AUTH_TOKEN="${BLUETOOTH_AUTH_TOKEN}"
-)
-
-target_compile_definitions(live-room-sensor PRIVATE
-        # Comment out to use the old micradar driver instead of the new minewsemi_radar driver
-        USE_NEW_MINEW_RADAR
+        REPORTING_PATH="${REPORTING_PATH}"
+        REPORTING_SERVER="${REPORTING_SERVER}"
 )
 
 target_sources(live-room-sensor PRIVATE

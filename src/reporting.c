@@ -20,10 +20,7 @@
 
 #define MAX_REPORTING_RETRIES 3
 
-#define REPORTING_SERVER "liveinfo.spacenet.se"
-
 #define REPORTING_REQUEST_BODY_TEMPLATE "{\"firmwareVersion\":\"%s\",\"sensorId\":\"%s\",\"occupants\":%d,\"radarState\":%d,\"pirState\":%s}"
-
 
 #ifdef USE_NEW_MINEW_RADAR
 #define FIRMWARE_STRING FIRMWARE_VERSION "-minew"
@@ -32,7 +29,7 @@
 #endif
 
 static const char REPORTING_REQUEST_TEMPLATE[] =
-        "POST /api/sensors/report HTTP/1.1\r\n"
+        "POST " REPORTING_PATH " HTTP/1.1\r\n"
         "Host: " REPORTING_SERVER "\r\n"
         "Content-Type: application/json\r\n"
         "Content-Length: %d\r\n"
