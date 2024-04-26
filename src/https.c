@@ -9,6 +9,7 @@
 #include "lwip/pbuf.h"
 #include "pico/cyw43_arch.h"
 #include "pico/stdlib.h"
+#include "multi_printf.h"
 
 typedef struct TLS_CLIENT_T_ {
     struct altcp_pcb *pcb;
@@ -33,7 +34,7 @@ static err_t tls_client_close(void *arg) {
         altcp_err(state->pcb, NULL);
         err = altcp_close(state->pcb);
         if (err != ERR_OK) {
-            printf("close failed %d, calling abort\n", err);
+            multi_printf("close failed %d, calling abort\n", err);
             altcp_abort(state->pcb);
             err = ERR_ABRT;
         }
@@ -45,14 +46,14 @@ static err_t tls_client_close(void *arg) {
 static err_t tls_client_connected(void *arg, struct altcp_pcb *pcb, err_t err) {
     TLS_CLIENT_T *state = (TLS_CLIENT_T *) arg;
     if (err != ERR_OK) {
-        printf("connect failed %d\n", err);
+        multi_printf("connect failed %d\n", err);
         return tls_client_close(state);
     }
 
-    printf("connected to server, sending request\n");
+    multi_printf("connected to server, sending request\n");
     err = altcp_write(state->pcb, state->http_request, state->http_request_len, TCP_WRITE_FLAG_COPY);
     if (err != ERR_OK) {
-        printf("error writing data, err=%d", err);
+        multi_printf("error writing data, err=%d", err);
         return tls_client_close(state);
     }
 
@@ -61,14 +62,14 @@ static err_t tls_client_connected(void *arg, struct altcp_pcb *pcb, err_t err) {
 
 static err_t tls_client_poll(void *arg, struct altcp_pcb *pcb) {
     TLS_CLIENT_T *state = (TLS_CLIENT_T *) arg;
-    printf("timed out\n");
+    multi_printf("timed out\n");
     state->error = PICO_ERROR_TIMEOUT;
     return tls_client_close(arg);
 }
 
 static void tls_client_err(void *arg, err_t err) {
     TLS_CLIENT_T *state = (TLS_CLIENT_T *) arg;
-    printf("tls_client_err %d\n", err);
+    multi_printf("tls_client_err %d\n", err);
     tls_client_close(state);
     state->error = PICO_ERROR_GENERIC;
 }
@@ -76,7 +77,7 @@ static void tls_client_err(void *arg, err_t err) {
 static err_t tls_client_recv(void *arg, struct altcp_pcb *pcb, struct pbuf *p, err_t err) {
     TLS_CLIENT_T *state = (TLS_CLIENT_T *) arg;
     if (!p) {
-        printf("connection closed\n");
+        multi_printf("connection closed\n");
         return tls_client_close(state);
     }
 
@@ -103,20 +104,20 @@ static void tls_client_connect_to_server_ip(const ip_addr_t *ipaddr, TLS_CLIENT_
     err_t err;
     u16_t port = 443;
 
-    printf("connecting to server IP %s port %d\n", ipaddr_ntoa(ipaddr), port);
+    multi_printf("connecting to server IP %s port %d\n", ipaddr_ntoa(ipaddr), port);
     err = altcp_connect(state->pcb, ipaddr, port, tls_client_connected);
     if (err != ERR_OK) {
-        fprintf(stderr, "error initiating connect, err=%d\n", err);
+        multi_printf("error initiating connect, err=%d\n", err);
         tls_client_close(state);
     }
 }
 
 static void tls_client_dns_found(const char *hostname, const ip_addr_t *ipaddr, void *arg) {
     if (ipaddr) {
-        printf("DNS resolving complete\n");
+        multi_printf("DNS resolving complete\n");
         tls_client_connect_to_server_ip(ipaddr, (TLS_CLIENT_T *) arg);
     } else {
-        printf("error resolving hostname %s\n", hostname);
+        multi_printf("error resolving hostname %s\n", hostname);
         tls_client_close(arg);
     }
 }
@@ -129,7 +130,7 @@ static bool tls_client_open(const char *hostname, void *arg) {
 
     state->pcb = altcp_tls_new(tls_config, IPADDR_TYPE_ANY);
     if (!state->pcb) {
-        printf("failed to create pcb\n");
+        multi_printf("failed to create pcb\n");
         return false;
     }
 
@@ -141,7 +142,7 @@ static bool tls_client_open(const char *hostname, void *arg) {
     /* Set SNI */
     mbedtls_ssl_set_hostname(altcp_tls_context(state->pcb), hostname);
 
-    printf("resolving %s\n", hostname);
+    multi_printf("resolving %s\n", hostname);
 
     // cyw43_arch_lwip_begin/end should be used around calls into lwIP to ensure correct locking.
     // You can omit them if you are in a callback from lwIP. Note that when using pico_cyw_arch_poll
@@ -154,7 +155,7 @@ static bool tls_client_open(const char *hostname, void *arg) {
         /* host is in DNS cache */
         tls_client_connect_to_server_ip(&server_ip, state);
     } else if (err != ERR_INPROGRESS) {
-        printf("error initiating DNS resolving, err=%d\n", err);
+        multi_printf("error initiating DNS resolving, err=%d\n", err);
         tls_client_close(state->pcb);
     }
 
@@ -167,14 +168,16 @@ static bool tls_client_open(const char *hostname, void *arg) {
 static TLS_CLIENT_T *tls_client_init(void) {
     TLS_CLIENT_T *state = calloc(1, sizeof(TLS_CLIENT_T));
     if (!state) {
-        printf("failed to allocate state\n");
+        multi_printf("failed to allocate state\n");
         return NULL;
     }
 
     return state;
 }
 
-bool send_https_request(const uint8_t *cert, size_t cert_len, const char *server, const char *request, size_t request_len, int timeout) {
+bool
+send_https_request(const uint8_t *cert, size_t cert_len, const char *server, const char *request, size_t request_len,
+                   int timeout) {
 
     tls_config = altcp_tls_create_config_client(cert, cert_len);
     assert(tls_config);

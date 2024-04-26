@@ -1,12 +1,18 @@
 #include "hardware/watchdog.h"
+
 #ifdef USE_NEW_MINEW_RADAR
+
 #include "minewsemi_radar.h"
+
 #endif
+
 #include "pico/cyw43_arch.h"
 #include "pico/stdlib.h"
 #include "reporting.h"
 #include "reset.h"
 #include "sensor_controller.h"
+#include "bluetooth_spp.h"
+#include "multi_printf.h"
 #include <stdio.h>
 
 
@@ -33,20 +39,20 @@ int main() {
         reset_pico();
     }
     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);
+    btstack_init();
     cyw43_arch_enable_sta_mode();
-
     printf("Initialized CYW43\n");
 
     // Connect to wireless network
-    printf("Connecting to " WIFI_SSID "\n");
+    multi_printf("Connecting to " WIFI_SSID "\n");
     int wifi_connect_result = cyw43_arch_wifi_connect_timeout_ms(
             WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK, 60000);
     if (wifi_connect_result) {
-        printf("Failed to connect to %s with error code %d\n", WIFI_SSID,
-               wifi_connect_result);
+        multi_printf("Failed to connect to %s with error code %d\n", WIFI_SSID,
+                     wifi_connect_result);
         reset_pico();
     }
-    printf("Connected to %s\n", WIFI_SSID);
+    multi_printf("Connected to %s\n", WIFI_SSID);
 
     sensor_controller_init();
     reporting_init();
@@ -64,5 +70,6 @@ int main() {
 #ifdef USE_NEW_MINEW_RADAR
         minewsemi_radar_tick();
 #endif
+        reset_request_tick();
     }
 }

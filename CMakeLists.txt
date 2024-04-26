@@ -61,6 +61,8 @@ target_sources(live-room-sensor PRIVATE
         src/reset.c
         src/reporting.c
         src/https.c
+        src/bluetooth_spp.c
+        src/multi_printf.c
 )
 
 add_compile_options(-Wall
@@ -77,4 +79,6 @@ target_link_libraries(live-room-sensor
         pico_lwip_mbedtls
         pico_mbedtls
         hardware_resets
+        pico_btstack_cyw43
+        pico_btstack_classic
 )

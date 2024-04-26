@@ -16,6 +16,7 @@
 #include "https.h"
 #include "lwip/pbuf.h"
 #include "reset.h"
+#include "multi_printf.h"
 
 #define MAX_REPORTING_RETRIES 3
 
@@ -109,7 +110,8 @@ static char request_buffer[1024];
 static char sensor_id[13];
 
 void reporting_init() {
-    snprintf(sensor_id, sizeof(sensor_id), "%02x%02x%02x%02x%02x%02x", cyw43_state.mac[0], cyw43_state.mac[1], cyw43_state.mac[2], cyw43_state.mac[3], cyw43_state.mac[4], cyw43_state.mac[5]);
+    snprintf(sensor_id, sizeof(sensor_id), "%02x%02x%02x%02x%02x%02x", cyw43_state.mac[0], cyw43_state.mac[1],
+             cyw43_state.mac[2], cyw43_state.mac[3], cyw43_state.mac[4], cyw43_state.mac[5]);
 }
 
 void send_sensor_report(int16_t occupants, int16_t radar_state, bool pir_state) {
@@ -120,7 +122,7 @@ void send_sensor_report(int16_t occupants, int16_t radar_state, bool pir_state) 
                             FIRMWARE_STRING, sensor_id, occupants, radar_state, pir_state_str);
 
     if (body_len < 0) {
-        printf("Failed to calculate request body size\n");
+        multi_printf("Failed to calculate request body size\n");
         return;
     }
 
@@ -128,25 +130,27 @@ void send_sensor_report(int16_t occupants, int16_t radar_state, bool pir_state) 
                                body_len, FIRMWARE_STRING, sensor_id, occupants, radar_state, pir_state_str);
 
     if (request_len < 0 || request_len >= sizeof(request_buffer)) {
-        printf("Failed to format request\n");
+        multi_printf("Failed to format request\n");
         return;
     }
 
     uint8_t tries = 0;
     bool success = false;
     do {
-        success = send_https_request(SERVER_CA_CERT, sizeof(SERVER_CA_CERT), REPORTING_SERVER, request_buffer, request_len, 5000);
+        success = send_https_request(SERVER_CA_CERT, sizeof(SERVER_CA_CERT), REPORTING_SERVER, request_buffer,
+                                     request_len, 5000);
 
         if (!success) {
-            printf("Failed to send report, retrying\n");
+            multi_printf("Failed to send report, retrying\n");
         }
 
     } while (!success && tries++ < MAX_REPORTING_RETRIES);
 
+
     if (success) {
-        printf("Report sent\n");
+        multi_printf("Report sent\n");
     } else {
-        printf("Failed to send report, resenting\n");
+        multi_printf("Failed to send report, resenting\n");
         reset_pico();
     }
 }
