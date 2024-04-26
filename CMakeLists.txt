@@ -23,6 +23,13 @@ else ()
     message(FATAL_ERROR "WIFI_PASSWORD must be set in the environment")
 endif ()
 
+if (DEFINED ENV{BLUETOOTH_AUTH_TOKEN} AND (NOT BLUETOOTH_AUTH_TOKEN))
+    set(BLUETOOTH_AUTH_TOKEN $ENV{BLUETOOTH_AUTH_TOKEN})
+    message("Using BLUETOOTH_AUTH_TOKEN from environment")
+else ()
+    message(FATAL_ERROR "BLUETOOTH_AUTH_TOKEN must be set in the environment")
+endif ()
+
 if (DEFINED ENV{REPORT_API_KEY} AND (NOT REPORT_API_KEY))
     set(REPORT_API_KEY $ENV{REPORT_API_KEY})
     message("Using REPORT_API_KEY from environment")
@@ -45,6 +52,7 @@ target_compile_definitions(live-room-sensor PRIVATE
         WIFI_SSID="${WIFI_SSID}"
         WIFI_PASSWORD="${WIFI_PASSWORD}"
         REPORT_API_KEY="${REPORT_API_KEY}"
+        BLUETOOTH_AUTH_TOKEN="${BLUETOOTH_AUTH_TOKEN}"
 )
 
 target_compile_definitions(live-room-sensor PRIVATE

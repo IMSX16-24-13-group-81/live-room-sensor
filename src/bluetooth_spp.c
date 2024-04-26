@@ -67,6 +67,9 @@
 #define COMMAND_RESET_PICO "PICO-RESET"
 #define COMMAND_RESET_PICO_SIZE (sizeof(COMMAND_RESET_PICO) - 1)
 
+#define COMPLETE_BLUETOOTH_AUTH_MESSAGE BLUETOOTH_AUTH_TOKEN"\r\n"
+#define COMPLETE_BLUETOOTH_AUTH_MESSAGE_SIZE (sizeof(COMPLETE_BLUETOOTH_AUTH_MESSAGE) - 1)
+
 #define RFCOMM_SERVER_CHANNEL 1
 
 #define RFCOMM_SEND_TIMER_PERIOD_MS 100
@@ -193,7 +196,7 @@ void rfcomm_send_now_event() {
 
 void process_authenticate_packet(uint8_t *packet, uint16_t size) {
 
-    if (size == 6 && memcmp(packet, "0000\r\n", 4) == 0) {
+    if (size == COMPLETE_BLUETOOTH_AUTH_MESSAGE_SIZE && memcmp(packet, COMPLETE_BLUETOOTH_AUTH_MESSAGE, 4) == 0) {
         rfcomm_user_has_authenticated = true;
         start_send_timer();
         bluetooth_printf("Authenticated\n");
@@ -448,7 +451,7 @@ int btstack_init() {
 
     gap_discoverable_control(1);
     gap_ssp_set_io_capability(SSP_IO_CAPABILITY_DISPLAY_YES_NO);
-    gap_set_local_name("IMX81 Sensor 00:00:00:00:00:00");
+    gap_set_local_name("IMSX81 Sensor 00:00:00:00:00:00");
 
     // turn on!
     hci_power_control(HCI_POWER_ON);
