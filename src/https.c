@@ -47,6 +47,7 @@ static err_t tls_client_connected(void *arg, struct altcp_pcb *pcb, err_t err) {
     TLS_CLIENT_T *state = (TLS_CLIENT_T *) arg;
     if (err != ERR_OK) {
         multi_printf("connect failed %d\n", err);
+        state->error = (int) err;
         return tls_client_close(state);
     }
 
@@ -54,6 +55,7 @@ static err_t tls_client_connected(void *arg, struct altcp_pcb *pcb, err_t err) {
     err = altcp_write(state->pcb, state->http_request, state->http_request_len, TCP_WRITE_FLAG_COPY);
     if (err != ERR_OK) {
         multi_printf("error writing data, err=%d", err);
+        state->error = (int) err;
         return tls_client_close(state);
     }
 
@@ -108,6 +110,7 @@ static void tls_client_connect_to_server_ip(const ip_addr_t *ipaddr, TLS_CLIENT_
     err = altcp_connect(state->pcb, ipaddr, port, tls_client_connected);
     if (err != ERR_OK) {
         multi_printf("error initiating connect, err=%d\n", err);
+        state->error = (int) err;
         tls_client_close(state);
     }
 }
@@ -118,6 +121,7 @@ static void tls_client_dns_found(const char *hostname, const ip_addr_t *ipaddr, 
         tls_client_connect_to_server_ip(ipaddr, (TLS_CLIENT_T *) arg);
     } else {
         multi_printf("error resolving hostname %s\n", hostname);
+        ((TLS_CLIENT_T *) arg)->error = PICO_ERROR_NO_DATA;
         tls_client_close(arg);
     }
 }
@@ -175,9 +179,8 @@ static TLS_CLIENT_T *tls_client_init(void) {
     return state;
 }
 
-bool
-send_https_request(const uint8_t *cert, size_t cert_len, const char *server, const char *request, size_t request_len,
-                   int timeout) {
+bool send_https_request(const uint8_t *cert, size_t cert_len, const char *server, const char *request,
+                        size_t request_len, int timeout) {
 
     tls_config = altcp_tls_create_config_client(cert, cert_len);
     assert(tls_config);
