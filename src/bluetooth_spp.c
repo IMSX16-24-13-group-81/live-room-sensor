@@ -69,8 +69,10 @@
 
 #define RFCOMM_SERVER_CHANNEL 1
 
+#define RFCOMM_SEND_TIMER_PERIOD_MS 100
+
 #define MAX_SEND_MESSAGE_SIZE 1000
-#define SEND_QUEUE_SIZE 10
+#define SEND_QUEUE_SIZE 20
 
 typedef enum {
     SEND_MESSAGE_FREE,
@@ -97,6 +99,8 @@ static bool rfcomm_user_has_authenticated;
 static uint8_t spp_service_buffer[150];
 static btstack_packet_callback_registration_t hci_event_callback_registration;
 
+static btstack_timer_source_t rfcomm_send_timer;
+
 bool bluetooth_vprintf(const char *format, va_list args) {
     uint8_t *buffer = get_free_send_buffer(MAX_SEND_MESSAGE_SIZE);
     if (buffer == NULL) return false;
@@ -110,6 +114,11 @@ bool bluetooth_printf(const char *format, ...) {
     bool result = bluetooth_vprintf(format, args);
     va_end(args);
     return result;
+}
+
+static void start_send_timer() {
+    btstack_run_loop_set_timer(&rfcomm_send_timer, RFCOMM_SEND_TIMER_PERIOD_MS);
+    btstack_run_loop_add_timer(&rfcomm_send_timer);
 }
 
 /**
@@ -146,7 +155,6 @@ bool mark_buffer_to_send(uint8_t *buffer, size_t actual_size) {
             }
             send_queue[i].status = SEND_MESSAGE_SEND;
             send_queue[i].send_len = actual_size;
-            rfcomm_request_can_send_now_event(rfcomm_channel_id);
             return true;
         }
     }
@@ -181,29 +189,29 @@ void rfcomm_send_now_event() {
     if (messages_ready_to_send > 1) {
         rfcomm_request_can_send_now_event(rfcomm_channel_id);
     }
-
 }
 
-void process_received_message(uint8_t *packet, uint16_t size) {
-    if (!rfcomm_user_has_authenticated) {
-        if (size == 6 && memcmp(packet, "0000\r\n", 4) == 0) {
-            rfcomm_user_has_authenticated = true;
-            bluetooth_printf("Authenticated\n");
-            bluetooth_printf("Version: %s\n", FIRMWARE_VERSION);
+void process_authenticate_packet(uint8_t *packet, uint16_t size) {
+
+    if (size == 6 && memcmp(packet, "0000\r\n", 4) == 0) {
+        rfcomm_user_has_authenticated = true;
+        start_send_timer();
+        bluetooth_printf("Authenticated\n");
+        bluetooth_printf("Version: %s\n", FIRMWARE_VERSION);
 #ifdef USE_NEW_MINEW_RADAR
-            bluetooth_printf("With Minew radar support\n");
+        bluetooth_printf("With Minew radar support\n");
 #else
-            bluetooth_printf("With micradar support\n");
+        bluetooth_printf("With micradar support\n");
 #endif
+        printf("Bluetooth user authenticated\n");
 
-            printf("Bluetooth user authenticated\n");
-        } else {
-            printf("Bluetooth user failed to authenticate\n");
-            rfcomm_disconnect(rfcomm_channel_id);
-        }
-        return;
+    } else {
+        printf("Bluetooth user failed to authenticate\n");
+        rfcomm_disconnect(rfcomm_channel_id);
     }
+}
 
+void process_received_command(uint8_t *packet, uint16_t size) {
     if (size < COMMAND_PREFIX_SIZE + COMMAND_POSTFIX_SIZE ||
         memcmp(packet, COMMAND_PREFIX, COMMAND_PREFIX_SIZE) != 0 ||
         memcmp(packet + size - COMMAND_POSTFIX_SIZE, COMMAND_POSTFIX, COMMAND_POSTFIX_SIZE) != 0) {
@@ -252,6 +260,15 @@ void process_received_message(uint8_t *packet, uint16_t size) {
     bluetooth_printf("Unknown command\n");
 }
 
+void process_received_message(uint8_t *packet, uint16_t size) {
+    if (!rfcomm_user_has_authenticated) {
+        process_authenticate_packet(packet, size);
+        return;
+    }
+
+    process_received_command(packet, size);
+}
+
 
 /* @section SPP Service Setup
  *s
@@ -282,7 +299,7 @@ static void spp_service_setup(void) {
 #endif
 
     rfcomm_init();
-    rfcomm_register_service(packet_handler, RFCOMM_SERVER_CHANNEL, 0xffff);  // reserved channel, mtu limited by l2cap
+    rfcomm_register_service(packet_handler, RFCOMM_SERVER_CHANNEL, 0xffff);// reserved channel, mtu limited by l2cap
 
     // init SDP, create record for SPP and register with SDP
     sdp_init();
@@ -337,7 +354,7 @@ static void spp_service_setup(void) {
 static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size) {
     UNUSED(channel);
 
-/* LISTING_PAUSE */
+    /* LISTING_PAUSE */
     bd_addr_t event_addr;
     uint8_t rfcomm_channel_nr;
     uint16_t mtu;
@@ -346,7 +363,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
     switch (packet_type) {
         case HCI_EVENT_PACKET:
             switch (hci_event_packet_get_type(packet)) {
-/* LISTING_RESUME */
+                    /* LISTING_RESUME */
                 case HCI_EVENT_PIN_CODE_REQUEST:
                     // inform about pin code request
                     printf("Pin code request - using '0000'\n");
@@ -356,7 +373,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
 
                 case HCI_EVENT_USER_CONFIRMATION_REQUEST:
                     // ssp: inform about user confirmation request
-                    printf("SSP User Confirmation Request with numeric value '%06"PRIu32"'\n",
+                    printf("SSP User Confirmation Request with numeric value '%06" PRIu32 "'\n",
                            little_endian_read_32(packet, 8));
                     printf("SSP User Confirmation Auto accept\n");
                     break;
@@ -384,7 +401,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
                     rfcomm_send_now_event();
                     break;
 
-/* LISTING_PAUSE */
+                    /* LISTING_PAUSE */
                 case RFCOMM_EVENT_CHANNEL_CLOSED:
                     printf("RFCOMM channel closed\n");
                     rfcomm_channel_id = 0;
@@ -403,10 +420,27 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
         default:
             break;
     }
-/* LISTING_RESUME */
+    /* LISTING_RESUME */
 }
 
 /* LISTING_END */
+
+
+static void rfcomm_send_now_timer_handler(btstack_timer_source_t *ts) {
+
+    for (int i = 0; i < SEND_QUEUE_SIZE; ++i) {
+        if (send_queue[i].status == SEND_MESSAGE_SEND) {
+            rfcomm_request_can_send_now_event(rfcomm_channel_id);
+            break;
+        }
+    }
+
+    if (rfcomm_channel_id) {
+        btstack_run_loop_set_timer(ts, RFCOMM_SEND_TIMER_PERIOD_MS);
+        btstack_run_loop_add_timer(ts);
+    }
+}
+
 
 int btstack_init() {
 
@@ -419,7 +453,9 @@ int btstack_init() {
     // turn on!
     hci_power_control(HCI_POWER_ON);
 
+    btstack_run_loop_set_timer_handler(&rfcomm_send_timer, rfcomm_send_now_timer_handler);
+
+
     return 0;
 }
 /* EXAMPLE_END */
-

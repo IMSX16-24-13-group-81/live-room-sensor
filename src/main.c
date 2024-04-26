@@ -6,13 +6,13 @@
 
 #endif
 
+#include "bluetooth_spp.h"
+#include "multi_printf.h"
 #include "pico/cyw43_arch.h"
 #include "pico/stdlib.h"
 #include "reporting.h"
 #include "reset.h"
 #include "sensor_controller.h"
-#include "bluetooth_spp.h"
-#include "multi_printf.h"
 #include <stdio.h>
 
 
