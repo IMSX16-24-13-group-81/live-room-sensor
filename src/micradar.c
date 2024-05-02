@@ -5,6 +5,7 @@
 #include "math.h"
 #include "pico/printf.h"
 #include <string.h>
+#include "multi_printf.h"
 
 #ifndef USE_NEW_MINEW_RADAR
 
@@ -67,7 +68,7 @@ void handle_received_frame() {
     if (uart_rx_buf_head < 5) return;
 
     if (!checksum_is_valid((uint8_t *) uart_rx_buf, uart_rx_buf_head)) {
-        printf("Invalid checksum\n");
+        multi_printf("Invalid checksum\n");
         uart_rx_buf_head = 0;
         return;
     }
@@ -78,7 +79,7 @@ void handle_received_frame() {
             parse_trajectory_info((uint8_t *) uart_rx_buf, uart_rx_buf_head);
             break;
         default:
-            printf("Unknown radar message received\n");
+            multi_printf("Unknown radar message received\n");
             break;
     }
 
@@ -99,7 +100,7 @@ void on_uart_rx() {
 
         } else if (uart_rx_buf_head >= RX_BUF_SIZE - 1) {
             uart_rx_buf_head = 0;
-            printf("Radar UART receive buffer full where is should not be possible! Clearing and resetting!\n");
+            multi_printf("Radar UART receive buffer full where is should not be possible! Clearing and resetting!\n");
             continue;
         }
 
@@ -111,7 +112,7 @@ void on_uart_rx() {
             uart_rx_buf_head = 0;
         } else if (uart_rx_buf_head >= RX_BUF_SIZE - 1) {
             uart_rx_buf_head = 0;
-            printf("Radar UART receive buffer full without a complete frame found. Clearing and resetting!\n");
+            multi_printf("Radar UART receive buffer full without a complete frame found. Clearing and resetting!\n");
             continue;
         }
     }

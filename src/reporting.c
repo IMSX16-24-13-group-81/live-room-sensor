@@ -1,37 +1,18 @@
 #include "reporting.h"
 
-
-/*
- * Copyright (c) 2023 Raspberry Pi (Trading) Ltd.
- *
- * SPDX-License-Identifier: BSD-3-Clause
- */
-
-#include <string.h>
-#include <time.h>
-
 #include "cyw43.h"
 #include "cyw43_ll.h"
-#include "hardware/watchdog.h"
 #include "https.h"
-#include "lwip/pbuf.h"
 #include "reset.h"
+#include "multi_printf.h"
+#include "version.h"
 
 #define MAX_REPORTING_RETRIES 3
 
-#define REPORTING_SERVER "liveinfo.spacenet.se"
-
 #define REPORTING_REQUEST_BODY_TEMPLATE "{\"firmwareVersion\":\"%s\",\"sensorId\":\"%s\",\"occupants\":%d,\"radarState\":%d,\"pirState\":%s}"
 
-
-#ifdef USE_NEW_MINEW_RADAR
-#define FIRMWARE_STRING FIRMWARE_VERSION "-minew"
-#else
-#define FIRMWARE_STRING FIRMWARE_VERSION "-micradar"
-#endif
-
 static const char REPORTING_REQUEST_TEMPLATE[] =
-        "POST /api/sensors/report HTTP/1.1\r\n"
+        "POST " REPORTING_PATH " HTTP/1.1\r\n"
         "Host: " REPORTING_SERVER "\r\n"
         "Content-Type: application/json\r\n"
         "Content-Length: %d\r\n"
@@ -109,7 +90,8 @@ static char request_buffer[1024];
 static char sensor_id[13];
 
 void reporting_init() {
-    snprintf(sensor_id, sizeof(sensor_id), "%02x%02x%02x%02x%02x%02x", cyw43_state.mac[0], cyw43_state.mac[1], cyw43_state.mac[2], cyw43_state.mac[3], cyw43_state.mac[4], cyw43_state.mac[5]);
+    snprintf(sensor_id, sizeof(sensor_id), "%02x%02x%02x%02x%02x%02x", cyw43_state.mac[0], cyw43_state.mac[1],
+             cyw43_state.mac[2], cyw43_state.mac[3], cyw43_state.mac[4], cyw43_state.mac[5]);
 }
 
 void send_sensor_report(int16_t occupants, int16_t radar_state, bool pir_state) {
@@ -120,7 +102,7 @@ void send_sensor_report(int16_t occupants, int16_t radar_state, bool pir_state) 
                             FIRMWARE_STRING, sensor_id, occupants, radar_state, pir_state_str);
 
     if (body_len < 0) {
-        printf("Failed to calculate request body size\n");
+        multi_printf("Failed to calculate request body size\n");
         return;
     }
 
@@ -128,25 +110,27 @@ void send_sensor_report(int16_t occupants, int16_t radar_state, bool pir_state) 
                                body_len, FIRMWARE_STRING, sensor_id, occupants, radar_state, pir_state_str);
 
     if (request_len < 0 || request_len >= sizeof(request_buffer)) {
-        printf("Failed to format request\n");
+        multi_printf("Failed to format request\n");
         return;
     }
 
     uint8_t tries = 0;
     bool success = false;
     do {
-        success = send_https_request(SERVER_CA_CERT, sizeof(SERVER_CA_CERT), REPORTING_SERVER, request_buffer, request_len, 5000);
+        success = send_https_request(SERVER_CA_CERT, sizeof(SERVER_CA_CERT), REPORTING_SERVER, request_buffer,
+                                     request_len, 5000);
 
         if (!success) {
-            printf("Failed to send report, retrying\n");
+            multi_printf("Failed to send report, retrying\n");
         }
 
     } while (!success && tries++ < MAX_REPORTING_RETRIES);
 
+
     if (success) {
-        printf("Report sent\n");
+        multi_printf("Report sent\n");
     } else {
-        printf("Failed to send report, resenting\n");
+        multi_printf("Failed to send report, resenting\n");
         reset_pico();
     }
 }

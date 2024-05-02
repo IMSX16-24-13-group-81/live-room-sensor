@@ -4,7 +4,7 @@
 #include "hardware/uart.h"
 #include "hardware/watchdog.h"
 #include "math.h"
-#include "pico/printf.h"
+#include "multi_printf.h"
 #include "pico/time.h"
 #include <string.h>
 
@@ -27,6 +27,14 @@
 
 #define MAX_AT_RESPONSE_LENGTH 16
 
+#define SEND_REQUEST_BUF_SIZE 256
+
+static const uint8_t STUDYING_DIFFERENT_FROM_FLASH[] = {0x55, 0xAA, 0x06, 0x00, 0xB1, 0xB7};
+static const uint8_t STUDYING_DIFFERENT_FROM_4_MINUTES_ABORTING[] = {0x55, 0xAA, 0x06, 0x00, 0xB2, 0xB4};
+static const uint8_t STUDYING_SAME_AS_FLASH_SAVING[] = {0x55, 0xAA, 0x06, 0x00, 0xA1, 0xA7};
+static const uint8_t STUDYING_SAME_AS_4_MINUTES_AGO[] = {0x55, 0xAA, 0x06, 0x00, 0xA2, 0xA4};
+static const uint8_t STUDYING_SAME_FOR_5_PASSES_SAVING[] = {0x55, 0xAA, 0x06, 0x00, 0xA3, 0xA5};
+
 static volatile uint8_t uart_rx_buf[RX_BUF_SIZE];
 static volatile uint16_t uart_rx_buf_head = 0;
 
@@ -36,6 +44,11 @@ static volatile uint32_t previous_counts_sum = 0;
 static volatile uint64_t last_count_time = 0;
 
 static volatile uint64_t last_reset_time = 0;
+static volatile bool studying = false;
+static volatile bool reset_requested = false;
+
+static volatile uint8_t send_request_buf[SEND_REQUEST_BUF_SIZE];
+static volatile uint16_t send_request_len = 0;
 
 typedef struct {
     float x;
@@ -92,14 +105,14 @@ void parse_radar_frame(void) {
 
     uint32_t first_tlv = uint32_from_buf(&uart_rx_buf[16]);
     if (first_tlv != 1) {
-        printf("Invalid first TLV\n");
+        multi_printf("Invalid first TLV\n");
         return;
     }
 
     uint32_t points_size = uint32_from_buf(&uart_rx_buf[20]);
 
     if (points_size % sizeof(radar_point_t) != 0) {
-        printf("Invalid point count\n");
+        multi_printf("Invalid point count\n");
         return;
     }
 
@@ -110,14 +123,14 @@ void parse_radar_frame(void) {
 
     uint32_t second_tlv = uint32_from_buf(&uart_rx_buf[end_of_points]);
     if (second_tlv != 2) {
-        printf("Invalid second TLV\n");
+        multi_printf("Invalid second TLV\n");
         return;
     }
 
     uint32_t persons_size = uint32_from_buf(&uart_rx_buf[end_of_points + 4]);
 
     if (persons_size % sizeof(radar_person_t) != 0) {
-        printf("Invalid person count\n");
+        multi_printf("Invalid person count\n");
         return;
     }
 
@@ -129,15 +142,34 @@ void parse_radar_frame(void) {
 }
 
 void handle_AT_response(void) {
-    printf("AT response received from radar\n");
-    for (int i = 0; i < uart_rx_buf_head; i++) {
-        printf("%c", uart_rx_buf[i]);
-    }
-    printf("\n");
+    multi_printf("Received AT response from radar:\n%.*s\n", uart_rx_buf_head, uart_rx_buf);
 }
 
 void handle_save_para_failed(void) {
-    printf("Save Para Failed received from radar\n");
+    multi_printf("Save Para Failed received from radar\n");
+}
+
+void handle_studying_response(void) {
+
+    if (memcmp((uint8_t *) uart_rx_buf, STUDYING_DIFFERENT_FROM_FLASH, 6) == 0) {
+        multi_printf("Studying different from flash, starting new study\n");
+    } else if (memcmp((uint8_t *) uart_rx_buf, STUDYING_DIFFERENT_FROM_4_MINUTES_ABORTING, 6) == 0) {
+        multi_printf("Studying different from 4 minutes ago, aborting\n");
+        studying = false;
+        last_reset_time = time_us_64();
+    } else if (memcmp((uint8_t *) uart_rx_buf, STUDYING_SAME_AS_FLASH_SAVING, 6) == 0) {
+        multi_printf("Studying same as flash, saving\n");
+        studying = false;
+        last_reset_time = time_us_64();
+    } else if (memcmp((uint8_t *) uart_rx_buf, STUDYING_SAME_AS_4_MINUTES_AGO, 6) == 0) {
+        multi_printf("Studying same as 4 minutes ago, continuing\n");
+    } else if (memcmp((uint8_t *) uart_rx_buf, STUDYING_SAME_FOR_5_PASSES_SAVING, 6) == 0) {
+        multi_printf("Studying same for 5 passes, saving\n");
+        studying = false;
+        last_reset_time = time_us_64();
+    } else {
+        multi_printf("Unknown studying response\n");
+    }
 }
 
 void on_uart_rx() {
@@ -155,7 +187,7 @@ void on_uart_rx() {
             continue;
         } else if (uart_rx_buf_head >= RX_BUF_SIZE - 1) {
             uart_rx_buf_head = 0;
-            printf("Radar UART receive buffer full where is should not be possible! Clearing and resetting!\n");
+            multi_printf("Radar UART receive buffer full where is should not be possible! Clearing and resetting!\n");
             continue;
         }
 
@@ -165,7 +197,8 @@ void on_uart_rx() {
 
             case 0x01: {
                 // Start of a radar frame is 0x01 0x02 ... 0x08
-                if (uart_rx_buf_head < 8 && uart_rx_buf[uart_rx_buf_head - 1] != uart_rx_buf[uart_rx_buf_head - 2] + 1) {
+                if (uart_rx_buf_head < 8 &&
+                    uart_rx_buf[uart_rx_buf_head - 1] != uart_rx_buf[uart_rx_buf_head - 2] + 1) {
                     // Not a valid frame
                     uart_rx_buf_head = 0;
                     continue;
@@ -182,12 +215,12 @@ void on_uart_rx() {
                     } else if (uart_rx_buf_head > frame_length + 1) {
                         // We have more than one complete frame in the buffer. Should not happen
                         uart_rx_buf_head = 0;
-                        printf("More than one radar frame length in buffer!\n");
+                        multi_printf("More than one radar frame length in buffer!\n");
                         continue;
                     } else if (frame_length > RX_BUF_SIZE) {
                         // Frame length is too long
                         uart_rx_buf_head = 0;
-                        printf("Radar frame length too long!\n");
+                        multi_printf("Radar frame length too long!\n");
                         continue;
                     }
                 }
@@ -210,9 +243,23 @@ void on_uart_rx() {
                 } else if (uart_rx_buf_head >= MAX_AT_RESPONSE_LENGTH) {
                     // AT command too long
                     uart_rx_buf_head = 0;
-                    printf("AT command too long!\n");
+                    multi_printf("AT command too long!\n");
                     continue;
                 }
+                break;
+            }
+                //Studying responses from radar
+            case 0x55: {
+                if (uart_rx_buf_head == 6) {
+                    handle_studying_response();
+                    uart_rx_buf_head = 0;
+                    continue;
+                } else if (uart_rx_buf_head > 6) {
+                    // Too long, should not happen
+                    uart_rx_buf_head = 0;
+                    continue;
+                }
+                break;
             }
                 //Save Para Failed
             case 'S': {
@@ -230,12 +277,13 @@ void on_uart_rx() {
                     uart_rx_buf_head = 0;
                     continue;
                 }
+                break;
             }
         }
 
         if (uart_rx_buf_head >= RX_BUF_SIZE - 1) {
             uart_rx_buf_head = 0;
-            printf("Radar UART receive buffer full without a complete frame found. Clearing and resetting!\n");
+            multi_printf("Radar UART receive buffer full without a complete frame found. Clearing and resetting!\n");
             continue;
         }
     }
@@ -251,9 +299,46 @@ int16_t minewsemi_get_current_count(void) {
     }
 
     float average = ((float) previous_counts_sum) / (float) COUNT_AVERAGE_BUFFER_SIZE;
-    //printf("Average: %f\n", average);
 
-    return roundf(average);
+    return (int16_t) roundf(average);
+}
+
+/**
+ * Request a reset of the radar sensor on the next tick
+ */
+void minewsemi_request_reset_on_next_tick(void) {
+    reset_requested = true;
+}
+
+/**
+ * Request the radar sensor to send a message. Sent on the next tick.
+ * @param buf Contains the message to send
+ * @param len Length of the message
+ * @return True if the message was successfully requested, False otherwise
+ */
+bool minewsemi_request_send_message(uint8_t *buf, uint16_t len) {
+    if (send_request_len > 0) {
+        multi_printf("Send request already in progress\n");
+        return false;
+    }
+
+    if (len > SEND_REQUEST_BUF_SIZE) {
+        multi_printf("Send request too long\n");
+        return false;
+    }
+
+    memcpy((void *) send_request_buf, buf, len);
+    if (send_request_buf[len - 1] != '\n') {
+        if (len == SEND_REQUEST_BUF_SIZE) {
+            multi_printf("Send request too long\n");
+            return false;
+        }
+        send_request_buf[len] = '\n';
+        len++;
+    }
+    send_request_len = len;
+
+    return true;
 }
 
 /**
@@ -263,42 +348,42 @@ void minewsemi_reset_and_configure(void) {
     uart_puts(UART_ID, "AT+RESET\n");
     watchdog_update();
     sleep_ms(1000);
-    uart_puts(UART_ID, "AT+STOP\n");
-    sleep_ms(100);
-    uart_puts(UART_ID, "AT+MONTIME=10\n");
-    sleep_ms(100);
-    uart_puts(UART_ID, "AT+TIME=100\n");
-    sleep_ms(100);
-    uart_puts(UART_ID, "AT+RANGE=1000\n");
-    sleep_ms(100);
-    uart_puts(UART_ID, "AT+SENS=19\n");
-    sleep_ms(100);
-    uart_puts(UART_ID, "AT+WINARANGE=999999999999\n");
-    sleep_ms(100);
-    uart_puts(UART_ID, "AT+WINBRANGE=999999999999\n");
-    sleep_ms(100);
-    uart_puts(UART_ID, "AT+WINCRANGE=999999999999\n");
-    sleep_ms(100);
-    uart_puts(UART_ID, "AT+WINDRANGE=999999999999\n");
-    sleep_ms(100);
-    uart_puts(UART_ID, "AT+WINERANGE=999999999999\n");
-    sleep_ms(100);
-    uart_puts(UART_ID, "AT+WINFRANGE=999999999999\n");
-    sleep_ms(100);
     uart_puts(UART_ID, "AT+START\n");
     watchdog_update();
     last_reset_time = time_us_64();
 }
 
 /**
+ * Starts a new radar study/calibration
+ */
+void minewsemi_start_studying(void) {
+    uart_puts(UART_ID, "AT+STUDY\n");
+}
+
+/**
  * Tick function to be called periodically
  */
 void minewsemi_radar_tick(void) {
+    uint64_t now = time_us_64();
+    bool radar_timeout = now > ((COUNT_VALIDITY_TIMEOUT_MS * 10 * 1000) + last_count_time);
+    bool reset_cooldown = now < ((RESET_TIMEOUT_MS * 1000) + last_reset_time);
+
     // If we have not received a valid count in a while, reset the radar
-    if ((time_us_64() - last_reset_time > RESET_TIMEOUT_MS * 1000) &&
-        (time_us_64() - last_count_time > COUNT_VALIDITY_TIMEOUT_MS * 10 * 1000)) {
-        printf("Resetting radar\n");
+    if (reset_requested || (radar_timeout && !reset_cooldown && !studying)) {
+
+        multi_printf("Last count time %llu, Last reset time %llu, Current time %llu, Count limit %llu, Reset limit %llu\n",
+                     last_count_time, last_reset_time, now, ((COUNT_VALIDITY_TIMEOUT_MS * 10 * 1000) + last_count_time),
+                     ((RESET_TIMEOUT_MS * 1000) + last_reset_time));
+
+        reset_requested = false;
+        multi_printf("Resetting radar\n");
         minewsemi_reset_and_configure();
+    }
+
+    if (send_request_len > 0) {
+        multi_printf("Sending requested message to radar\n");
+        uart_write_blocking(UART_ID, (uint8_t *) send_request_buf, send_request_len);
+        send_request_len = 0;
     }
 }
 
